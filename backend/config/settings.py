@@ -127,7 +127,9 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # is "must be authenticated", so any endpoint we add is locked unless it opts
 # out explicitly.
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": [],
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
