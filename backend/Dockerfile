@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# entrypoint runs migrations, then execs the CMD (gunicorn by default).
-RUN chmod +x /app/entrypoint.sh
-ENTRYPOINT ["/app/entrypoint.sh"]
+# Invoke via `sh` so it works even when a bind mount shadows this layer with a
+# host file that doesn't carry the executable bit (see DEBUGGING.md).
+ENTRYPOINT ["sh", "/app/entrypoint.sh"]
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]
