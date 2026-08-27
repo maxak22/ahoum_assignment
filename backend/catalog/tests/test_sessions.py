@@ -46,7 +46,8 @@ class SessionListingTests(APITestCase):
 
 class SessionCreateValidationTests(APITestCase):
     def setUp(self):
-        self.user = make_user("u@example.com")
+        # a creator, so we get past authorization and actually exercise validation
+        self.user = make_user("u@example.com", is_creator=True)
         self.payload = {
             "title": "New session",
             "description": "d",

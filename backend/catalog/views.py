@@ -1,5 +1,7 @@
 from django.db.models import Q
-from rest_framework import permissions, viewsets
+from rest_framework import viewsets
+
+from accounts.permissions import IsCreatorOrReadOnly, IsOwnerOrReadOnly
 
 from .models import Session
 from .serializers import SessionSerializer
@@ -10,16 +12,15 @@ class SessionViewSet(viewsets.ModelViewSet):
     /api/sessions/           GET  list   (public sessions; + your own if authed)
     /api/sessions/?mine=1    GET  list   (your own sessions, incl. private)
     /api/sessions/{id}/      GET  detail
-    /api/sessions/           POST create
-    /api/sessions/{id}/      PATCH/PUT/DELETE
+    /api/sessions/           POST create   (creators only -> 403 otherwise)
+    /api/sessions/{id}/      PATCH/PUT/DELETE   (owning creator only -> 403 otherwise)
 
-    NOTE: permissions here are still coarse (`IsAuthenticatedOrReadOnly`).
-    Phase 5 replaces this with IsCreator + object-level ownership so a normal
-    User gets 403 on create and a Creator gets 403 editing someone else's session.
+    Authorization is enforced here on the backend. The React app hides buttons
+    for UX only.
     """
 
     serializer_class = SessionSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [IsCreatorOrReadOnly, IsOwnerOrReadOnly]
 
     def get_queryset(self):
         qs = Session.objects.select_related("creator")
