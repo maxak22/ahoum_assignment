@@ -148,11 +148,17 @@ you explicitly run `docker compose down -v` or `docker volume rm`.
 ## 8. Running tests
 
 ```bash
-docker compose exec backend python manage.py test
+docker compose exec backend python manage.py test          # whole suite
+docker compose exec backend python manage.py test accounts # one app
 ```
 
 Tests run against a real PostgreSQL test database (row-level locking and partial
-unique indexes do not behave the same on SQLite).
+unique indexes do not behave the same on SQLite). Current count: 40 tests.
+
+The two required authorization/error cases and more live in
+`accounts/tests/test_auth.py` (401 no token, 401 bad token, OAuth failures) and
+`catalog/tests/test_authorization.py` (normal user → 403 on create, creator A →
+403 on creator B's session / delete).
 
 ---
 
@@ -162,15 +168,28 @@ unique indexes do not behave the same on SQLite).
 docker compose exec backend python manage.py test bookings.tests.test_concurrency
 ```
 
-It creates one `capacity = 1` session and two authenticated users, fires two
-booking requests from two threads gated on a `threading.Barrier`, and asserts:
+`bookings/tests/test_concurrency.py` is a `TransactionTestCase` with three tests:
 
-- exactly one `201` and one `409`,
-- final active booking count is exactly `1`,
-- the session's `seats_taken` counter is exactly `1`.
+| test | scenario | asserts |
+|---|---|---|
+| `test_two_concurrent_requests_for_the_last_seat` | `capacity=1`, 2 users, 2 threads released together by a `threading.Barrier`, both `POST /api/sessions/{id}/book/` | exactly one `201` and one `409`; active bookings `== 1`; `seats_taken == 1` |
+| `test_many_concurrent_requests_never_oversell` | `capacity=3`, 12 concurrent users | exactly 3× `201`, 9× `409`; active `== 3`; `seats_taken == 3` |
+| `test_a_naive_check_then_create_oversells` | same threads/barrier, but a naive unlocked `if seats_taken < capacity: create()` patched in | **both** succeed, session **oversold** — proof the test detects the bug our implementation avoids |
 
-Why this exposes a naive implementation and why ours passes: see
-[DECISIONS.md](DECISIONS.md) → "Booking concurrency strategy".
+- **Why `TransactionTestCase` not `TestCase`:** `TestCase` wraps each test in a
+  transaction it never commits, so worker threads (separate DB connections)
+  can't see the setup rows and `SELECT ... FOR UPDATE` has nothing committed to
+  lock. `TransactionTestCase` commits for real.
+- **Why PostgreSQL:** SQLite ignores `FOR UPDATE` and locks coarsely.
+- **Why the naive version oversells and ours doesn't:** see
+  [DECISIONS.md](DECISIONS.md) → "Booking concurrency strategy".
+
+Live demo against the real DB (not the test DB):
+
+```bash
+docker compose exec backend python manage.py demo_race
+docker compose exec backend python manage.py demo_race --concurrency 20 --capacity 3
+```
 
 ---
 

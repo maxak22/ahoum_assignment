@@ -60,6 +60,33 @@ For each: tool/model · the prompt (summarised) · what was suggested · what I 
 
 ---
 
+## P3 — Phases 4-7: sessions, authorization, bookings, concurrency test
+
+- **Tool / model:** Claude Code (claude-sonnet-5)
+- **Prompt (summary):** "Build the catalog app (Session + CHECK constraints +
+  CRUD), then IsCreator/ownership permissions, then the concurrency-safe booking
+  service, then the race test. Explain the locking before coding it."
+- **What was suggested:**
+  - `seats_taken` denormalised counter + `CHECK (seats_taken <= capacity)` so
+    overselling is impossible at the storage layer.
+  - Two permission classes (`IsCreatorOrReadOnly` view-level, `IsOwnerOrReadOnly`
+    object-level) rather than one.
+  - `book_session()` = `transaction.atomic` + `select_for_update()` on the
+    session row, checks, INSERT (partial unique index), `F()` counter bump.
+  - Concurrency test as `TransactionTestCase` + `threading.Barrier`, plus a
+    `test_a_naive_check_then_create_oversells` that patches in a naive version
+    and shows it DOES oversell — proving the test has teeth.
+  - `demo_race` management command as a runnable script for live demos.
+- **What I kept:** All of it.
+- **What I changed / rejected:** Added an explicit `Booking.objects.filter(...)
+  .exists()` early check in `book_session` — see "AI got wrong" #3 below.
+- **How I verified it:** `manage.py test` (40 passing), the 3 concurrency tests
+  green, `demo_race --concurrency 20 --capacity 3` → exactly 3 OK / 17 rejected /
+  verdict "safe", and live curl of every booking rule (double-book, full,
+  started, own-session).
+
+---
+
 ## What AI got wrong / what I corrected
 
 1. **Entrypoint made non-executable by the bind mount.** The first Dockerfile
@@ -76,3 +103,13 @@ For each: tool/model · the prompt (summarised) · what was suggested · what I 
    `0002_user_profile_fields.py`, then had to fix the `django_migrations` table
    (delete the stale row, re-`--fake` the renamed one) because Django tracks
    applied migrations by name. Lesson: pass `makemigrations -n <name>` up front.
+
+3. **Wrong 409 message on a double-book of a full session.** The first
+   `book_session` relied entirely on the partial unique index to reject a repeat
+   booking. But when `capacity == 1` and the same user re-books, the
+   `seats_taken >= capacity` check fires *first*, so the user saw "This session
+   is fully booked" instead of "You already have an active booking". Found it
+   with a live curl, not a test (the test only checked the 409 status). Fix:
+   added an explicit `Booking.objects.filter(user, session, status=active)
+   .exists()` check before the capacity check, purely for the message — the
+   unique index is still the race-safe guard.
