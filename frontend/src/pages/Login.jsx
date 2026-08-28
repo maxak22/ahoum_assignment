@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation, Navigate, Link } from 'react-router-dom'
-import { GoogleLogin } from '@react-oauth/google'
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google'
 import { useAuth } from '../auth/AuthContext.jsx'
 import { apiErrorMessage } from '../api/client.js'
 import BrandMark from '../components/BrandMark.jsx'
@@ -8,6 +8,14 @@ import BrandMark from '../components/BrandMark.jsx'
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
 export default function Login() {
+  return (
+    <GoogleOAuthProvider clientId={googleClientId}>
+      <LoginView />
+    </GoogleOAuthProvider>
+  )
+}
+
+function LoginView() {
   const { user, loginWithGoogle, devLogin } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()

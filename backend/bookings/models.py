@@ -21,6 +21,10 @@ class Booking(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            # "my bookings" filters by user + status
+            models.Index(fields=["user", "status"], name="booking_user_status_idx"),
+        ]
         constraints = [
             # Partial unique index: at most one ACTIVE booking per (user, session).
             # Cancelled rows don't count, so a user can cancel and rebook.

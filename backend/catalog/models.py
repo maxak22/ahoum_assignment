@@ -38,6 +38,10 @@ class Session(models.Model):
 
     class Meta:
         ordering = ["start_at"]
+        indexes = [
+            # the catalog query: public sessions ordered by start time
+            models.Index(fields=["is_public", "start_at"], name="session_public_start_idx"),
+        ]
         constraints = [
             # PositiveIntegerField already gives us `>= 0` at the DB level; these
             # add the domain rules on top.

@@ -134,3 +134,42 @@ $ curl -s -XPOST -H "Authorization: Bearer $U1" http://localhost/api/sessions/$S
 
 `bookings.tests.test_bookings` still green (11 tests); the concurrency tests
 (which race *different* users) unaffected.
+
+---
+
+## D4 — nginx gzip config edited but responses still uncompressed
+
+**Symptom.** Added `gzip on` + `gzip_types` to `nginx/default.conf`,
+`docker compose up -d` reported no changes, and responses still came back
+uncompressed. `docker compose exec nginx cat /etc/nginx/conf.d/default.conf`
+showed the new directives, but `nginx -T` (the *effective* config) did not.
+
+**Diagnosis.** `nginx/default.conf` is bind-mounted into the container.
+`docker compose up -d` only recreates a container when its **compose-level**
+config changes (image, env, ports, volume list) — editing the *contents* of a
+mounted file is invisible to it. And nginx doesn't watch its files, so the
+already-running process kept serving the old config.
+
+**Root cause.** Bind-mount content changes need an explicit reload/recreate.
+
+**Fix.**
+
+```
+docker compose restart nginx          # reloads the mounted file
+# or, to be certain:
+docker compose up -d --force-recreate nginx
+```
+
+A fresh `docker compose up --build` (what a reviewer runs) always reads the
+current file, so this only bites during iterative local edits.
+
+**Verification.**
+
+```
+$ docker compose exec nginx nginx -T | grep 'gzip on'
+gzip on;
+$ curl -s -D- -H 'Accept-Encoding: gzip' -o /dev/null http://localhost/assets/react-vendor-*.js | grep -i content-encoding
+content-encoding: gzip
+```
+
+react-vendor chunk over the wire: 165 KB → 54 KB.

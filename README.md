@@ -268,7 +268,36 @@ docker compose exec backend python manage.py demo_race --concurrency 20 --capaci
 
 ---
 
-## 10. Known limitations
+## 10. Performance
+
+Nothing exotic — just the usual levers:
+
+**Frontend**
+- **Route-level code splitting** (`React.lazy`) — each page is its own chunk;
+  the framework (`react`, `react-dom`, `react-router`) is a separate
+  long-cached vendor chunk. `@react-oauth/google` + the Google GIS script load
+  only on `/login`.
+- **Self-hosted fonts** with `font-display: swap` and `unicode-range` (only the
+  latin subset is downloaded); hashed assets are `Cache-Control: immutable`,
+  `index.html` is `no-cache`.
+- **nginx gzip** on JS/CSS/JSON/SVG — e.g. the vendor chunk is 165 KB raw,
+  ~54 KB on the wire.
+
+Cold load of `/` (catalog): DOMContentLoaded ~90 ms, ~180 KB transferred
+(most of it fonts, cached after first visit).
+
+**Backend**
+- `CONN_MAX_AGE=60` — reuse Postgres connections instead of reconnecting per
+  request.
+- `select_related` on the catalog and bookings querysets (no N+1 on the nested
+  creator / session).
+- Composite indexes for the hot queries: `Session(is_public, start_at)` for the
+  catalog, `Booking(user, status)` for "my bookings".
+- WhiteNoise serves pre-compressed static files.
+
+---
+
+## 11. Known limitations
 
 - **No HTTPS.** nginx serves plain HTTP on `:80`; TLS termination is out of
   scope. `SECURE_SSL_REDIRECT` / HSTS are therefore off.
@@ -292,7 +321,7 @@ docker compose exec backend python manage.py demo_race --concurrency 20 --capaci
 
 ---
 
-## 11. What I'd improve with another day
+## 12. What I'd improve with another day
 
 - **Move auth to `httpOnly` refresh cookies** + short-lived in-memory access
   token, with CSRF protection on the refresh endpoint.
