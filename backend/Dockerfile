@@ -15,4 +15,6 @@ COPY . .
 # Invoke via `sh` so it works even when a bind mount shadows this layer with a
 # host file that doesn't carry the executable bit (see DEBUGGING.md).
 ENTRYPOINT ["sh", "/app/entrypoint.sh"]
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]
+# shell form so $PORT (set by Render/Railway/Fly; defaults to 8000 for compose)
+# is expanded at runtime.
+CMD ["sh", "-c", "gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-3}"]

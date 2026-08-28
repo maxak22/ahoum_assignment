@@ -32,6 +32,11 @@ SECRET_KEY = env("DJANGO_SECRET_KEY", "insecure-dev-key-change-me")
 DEBUG = env_bool("DJANGO_DEBUG", False)
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,backend")
 
+# Platforms like Render expose the public hostname at runtime.
+_platform_host = env("RENDER_EXTERNAL_HOSTNAME")
+if _platform_host:
+    ALLOWED_HOSTS.append(_platform_host)
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -82,22 +87,38 @@ TEMPLATES = [
 
 
 # --- database -----------------------------------------------------------
-# Built from POSTGRES_* env vars. PostgreSQL only: the booking concurrency
-# code relies on real row-level locking (SELECT ... FOR UPDATE) and partial
-# unique indexes, neither of which SQLite supports meaningfully.
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": env("POSTGRES_DB", "sessions_marketplace"),
-        "USER": env("POSTGRES_USER", "sessions"),
-        "PASSWORD": env("POSTGRES_PASSWORD", ""),
-        "HOST": env("POSTGRES_HOST", "db"),
-        "PORT": env("POSTGRES_PORT", "5432"),
-        # reuse a connection across requests instead of reconnecting every time
-        "CONN_MAX_AGE": int(env("DB_CONN_MAX_AGE", "60")),
-        "CONN_HEALTH_CHECKS": True,
+# PostgreSQL only: the booking concurrency code relies on real row-level locking
+# (SELECT ... FOR UPDATE) and partial unique indexes.
+#
+# Managed hosts (Render, Railway, Fly, Heroku) provide a single DATABASE_URL;
+# locally we build the config from the POSTGRES_* vars docker-compose sets.
+_conn_max_age = int(env("DB_CONN_MAX_AGE", "60"))
+DATABASE_URL = env("DATABASE_URL")
+
+if DATABASE_URL:
+    import dj_database_url
+
+    DATABASES = {
+        "default": dj_database_url.parse(
+            DATABASE_URL,
+            conn_max_age=_conn_max_age,
+            conn_health_checks=True,
+            ssl_require=env_bool("DATABASE_SSL_REQUIRE", True),
+        )
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": env("POSTGRES_DB", "sessions_marketplace"),
+            "USER": env("POSTGRES_USER", "sessions"),
+            "PASSWORD": env("POSTGRES_PASSWORD", ""),
+            "HOST": env("POSTGRES_HOST", "db"),
+            "PORT": env("POSTGRES_PORT", "5432"),
+            "CONN_MAX_AGE": _conn_max_age,
+            "CONN_HEALTH_CHECKS": True,
+        }
+    }
 
 
 # --- auth --------------------------------------------------------------
@@ -165,6 +186,8 @@ CORS_ALLOWED_ORIGINS = env_list(
 CSRF_TRUSTED_ORIGINS = env_list(
     "DJANGO_CSRF_TRUSTED_ORIGINS", "http://localhost,http://127.0.0.1"
 )
+if _platform_host:
+    CSRF_TRUSTED_ORIGINS.append(f"https://{_platform_host}")
 
 
 # --- Google OAuth --------------------------------------------------
@@ -172,8 +195,13 @@ CSRF_TRUSTED_ORIGINS = env_list(
 GOOGLE_OAUTH_CLIENT_ID = env("GOOGLE_OAUTH_CLIENT_ID", "")
 
 
+# --- CORS: allow non-simple requests + let axios read the response --------
+CORS_ALLOW_CREDENTIALS = False  # we send the JWT in a header, not a cookie
+
 # --- security (only bite when DEBUG is off) --------------------------------
 if not DEBUG:
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+    # behind a TLS-terminating proxy (Render/Railway/nginx), trust the header
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

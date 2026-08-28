@@ -208,7 +208,69 @@ docker compose down -v           # stop AND delete the db volume (wipes data)
 
 ---
 
-## 7. Database persistence
+## 7. Deployment (Vercel + Render)
+
+The compose stack (§2) is one deployable unit — for a VPS you'd just run
+`docker compose up -d` behind a TLS proxy. The hosted setup below splits it:
+**frontend → Vercel** (static, global CDN), **backend + Postgres → Render**.
+nginx isn't used; Vercel serves the SPA and proxies `/api/*` to Render, so the
+app stays same-origin (no CORS, and Google's OAuth-popup COOP checks pass).
+
+```
+Browser ─► Vercel (SPA + /api proxy) ─► Render (Django/gunicorn) ─► Render Postgres
+```
+
+Files: [`render.yaml`](render.yaml) (backend + DB blueprint),
+[`frontend/vercel.json`](frontend/vercel.json) (build + API proxy + SPA fallback).
+
+### 1. Backend on Render
+
+1. **New → Blueprint → this repo.** Render reads `render.yaml`: a Docker web
+   service (`backend/Dockerfile`) + a free PostgreSQL instance, wired by
+   `DATABASE_URL`.
+2. Fill the prompted env vars — leave `CORS_ALLOWED_ORIGINS` /
+   `DJANGO_CSRF_TRUSTED_ORIGINS` as placeholders for now, set
+   `GOOGLE_OAUTH_CLIENT_ID` to your client id.
+3. First deploy runs migrations + `collectstatic` + `seed_sessions` (via
+   `SEED_DEMO_DATA=1`). Note the URL, e.g. `https://sessions-backend.onrender.com`.
+4. `RENDER_EXTERNAL_HOSTNAME` is injected automatically and added to
+   `ALLOWED_HOSTS` / `CSRF_TRUSTED_ORIGINS` in `settings.py` — nothing to set.
+
+### 2. Frontend on Vercel
+
+1. **New Project → this repo → Root Directory: `frontend`.** Framework
+   auto-detects as Vite.
+2. In `frontend/vercel.json`, replace `REPLACE-WITH-YOUR-BACKEND.onrender.com`
+   with your Render host and commit.
+3. Env var: `VITE_GOOGLE_CLIENT_ID` = your Google client id. (`VITE_API_BASE_URL`
+   is unset → defaults to `/api`, which Vercel proxies to Render.)
+4. Deploy. Note the URL, e.g. `https://sessions-xyz.vercel.app`.
+
+### 3. Wire the two together
+
+- **Render** → set `CORS_ALLOWED_ORIGINS` and `DJANGO_CSRF_TRUSTED_ORIGINS` to
+  the Vercel URL (`https://sessions-xyz.vercel.app`), redeploy. (CORS isn't
+  strictly needed with the proxy, but it's correct hygiene.)
+- **Google Cloud Console** → the OAuth client → **Authorized JavaScript
+  origins** → add `https://sessions-xyz.vercel.app`.
+- With `DJANGO_DEBUG=0` the `dev-login` endpoint is disabled, so **Google is the
+  only sign-in in production** — make sure your Google account is a **Test user**
+  on the consent screen.
+
+### Notes
+
+- Render's **free web service sleeps after 15 min idle** (~40 s cold start on the
+  next request). Fine for review; for always-on use Render's paid tier, or
+  **Railway** (deploy from repo + Postgres plugin, no cold start, ~free on the
+  monthly credit for light traffic — same env vars).
+- Render's **free Postgres expires** after its trial window; export/recreate or
+  upgrade for anything long-lived.
+- Data persistence: Render Postgres is a managed, always-on instance — backend
+  redeploys don't touch it. (Locally it's the `pgdata` volume, §8.)
+
+---
+
+## 8. Database persistence
 
 Postgres data is stored in a named Docker volume (`pgdata`) declared in
 `docker-compose.yml`, mounted at `/var/lib/postgresql/data`. Restarting or
@@ -217,7 +279,7 @@ you explicitly run `docker compose down -v` or `docker volume rm`.
 
 ---
 
-## 8. Running tests
+## 9. Running tests
 
 ```bash
 docker compose exec backend python manage.py test          # whole suite
@@ -237,7 +299,7 @@ unique indexes do not behave the same on SQLite). Current count: **43 tests**.
 
 ---
 
-## 9. Concurrency test
+## 10. Concurrency test
 
 ```bash
 docker compose exec backend python manage.py test bookings.tests.test_concurrency
@@ -268,7 +330,7 @@ docker compose exec backend python manage.py demo_race --concurrency 20 --capaci
 
 ---
 
-## 10. Performance
+## 11. Performance
 
 Nothing exotic — just the usual levers:
 
@@ -297,7 +359,7 @@ Cold load of `/` (catalog): DOMContentLoaded ~90 ms, ~180 KB transferred
 
 ---
 
-## 11. Known limitations
+## 12. Known limitations
 
 - **No HTTPS.** nginx serves plain HTTP on `:80`; TLS termination is out of
   scope. `SECURE_SSL_REDIRECT` / HSTS are therefore off.
@@ -321,7 +383,7 @@ Cold load of `/` (catalog): DOMContentLoaded ~90 ms, ~180 KB transferred
 
 ---
 
-## 12. What I'd improve with another day
+## 13. What I would improve with another day
 
 - **Move auth to `httpOnly` refresh cookies** + short-lived in-memory access
   token, with CSRF protection on the refresh endpoint.

@@ -1,0 +1,48 @@
+# Render blueprint — backend (Docker) + managed PostgreSQL.
+# The frontend deploys separately on Vercel (see frontend/vercel.json).
+#
+#   1. Push this repo to GitHub.
+#   2. Render dashboard -> New -> Blueprint -> pick this repo.
+#   3. Fill the `sync: false` env vars when prompted (values come from the
+#      Vercel deploy — see README "Deployment").
+
+databases:
+  - name: sessions-db
+    plan: free
+    databaseName: sessions
+    user: sessions
+
+services:
+  - type: web
+    name: sessions-backend
+    runtime: docker
+    plan: free
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    healthCheckPath: /api/health/
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sessions-db
+          property: connectionString
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "0"
+      - key: WEB_CONCURRENCY
+        value: "2"
+      - key: SEED_DEMO_DATA
+        value: "1"
+      # RENDER_EXTERNAL_HOSTNAME is injected automatically and added to
+      # ALLOWED_HOSTS / CSRF_TRUSTED_ORIGINS in settings.py.
+      - key: DJANGO_ALLOWED_HOSTS
+        value: "localhost,127.0.0.1"
+      # set these two to your Vercel URL, e.g. https://sessions-xyz.vercel.app
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: DJANGO_CSRF_TRUSTED_ORIGINS
+        sync: false
+      # from Google Cloud Console (same client id the frontend uses)
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
