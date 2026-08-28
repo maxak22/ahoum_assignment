@@ -28,6 +28,22 @@ class AuthTests(APITestCase):
         res = self.client.get(reverse("auth-me"))
         self.assertEqual(res.status_code, 401)
 
+    def test_me_rejects_an_expired_access_token(self):
+        from datetime import timedelta
+
+        from rest_framework_simplejwt.tokens import AccessToken
+
+        user = User.objects.create(
+            username="u", email="u@example.com", google_sub="s"
+        )
+        token = AccessToken.for_user(user)
+        token.set_exp(lifetime=-timedelta(minutes=5))  # already expired
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+        res = self.client.get(reverse("auth-me"))
+        self.assertEqual(res.status_code, 401)
+        self.assertIn("token", str(res.data).lower())
+
     # ---- 400: Google token / OAuth failures ---------------------------
     @patch("accounts.services.google_id_token.verify_oauth2_token")
     def test_login_rejects_unverified_email_and_creates_no_user(self, mock_verify):

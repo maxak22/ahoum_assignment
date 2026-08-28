@@ -225,11 +225,11 @@ docker compose exec backend python manage.py test accounts # one app
 ```
 
 Tests run against a real PostgreSQL test database (row-level locking and partial
-unique indexes do not behave the same on SQLite). Current count: **42 tests**.
+unique indexes do not behave the same on SQLite). Current count: **43 tests**.
 
 | area | file | notable cases |
 |---|---|---|
-| auth / errors | `accounts/tests/test_auth.py` | 401 no token, 401 bad token, OAuth failures (unverified email, invalid token), dev-login 404 when `DEBUG=0` |
+| auth / errors | `accounts/tests/test_auth.py` | 401 no token, 401 malformed token, **401 expired token**, OAuth failures (unverified email, invalid token), dev-login 404 when `DEBUG=0` |
 | authorization | `catalog/tests/test_authorization.py` | normal user → **403** on create; creator A → **403** editing / deleting creator B's session |
 | sessions | `catalog/tests/test_sessions.py` | visibility, validation, DB `CHECK` constraints |
 | bookings | `bookings/tests/test_bookings.py` | double-book, full, started, own-session, cancel + rebook, cancel-auth |

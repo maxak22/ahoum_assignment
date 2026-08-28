@@ -86,6 +86,28 @@ contend). We also carry a denormalized `seats_taken` counter that must be kept i
 sync on every book/cancel — extra code and a place bugs can hide — in exchange
 for a hard database-level guarantee that capacity can't be exceeded.
 
+### Where each invariant is enforced
+
+| Invariant | Database | Application | Notes |
+|---|---|---|---|
+| `seats_taken` never exceeds `capacity` | ✅ `CHECK (seats_taken <= capacity)` | ✅ `seats_taken >= capacity` check under the row lock | DB is the guarantee; the app check produces a clean `409` instead of an `IntegrityError` |
+| `capacity > 0`, `duration_minutes > 0` | ✅ `CHECK` constraints | ✅ serializer `validate_*` | app gives field-level messages; DB stops any other writer |
+| one *active* booking per (user, session) | ✅ partial unique index `(user, session) WHERE status='active'` | ✅ early `.exists()` check for the message | index is race-safe; the app check is only for a friendlier error |
+| a booking's session hasn't started yet | ❌ (time-based, not a stored fact) | ✅ `session.start_at <= now()` under the lock | can't be a `CHECK` — "now" isn't a column |
+| only a creator creates sessions | ❌ | ✅ `IsCreatorOrReadOnly` permission | `403` |
+| only the owning creator edits/deletes | ❌ | ✅ `IsOwnerOrReadOnly` object permission | `403` |
+
+**Why a frontend `remainingSeats` check is insufficient.** The value the SPA holds
+is a *stale snapshot* fetched with the session detail — by the time the user
+clicks "Book" it may be minutes old and several bookings behind. Two users can
+both be looking at `remainingSeats: 1` at the same instant. And the check runs on
+the client, so anyone can bypass it entirely (dev tools, `curl`, a replayed
+request) and `POST` straight to `/api/sessions/{id}/book/`. The frontend value
+exists only to disable a button and show "Fully booked" — it is never trusted.
+Every one of the rules above is re-checked server-side on the write path, inside
+the transaction, against freshly-locked state; the API response is the only
+source of truth the UI acts on.
+
 ---
 
 ## 3. Database constraints vs application validation
