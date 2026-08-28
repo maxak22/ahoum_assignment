@@ -1,14 +1,30 @@
 # Sessions Marketplace
 
-A small marketplace where **Creators** publish bookable sessions and **Users** browse
-and book them. Booking is the interesting part: it is concurrency-safe, so a
-`capacity = 1` session can never be booked twice even under simultaneous requests.
+### ▶︎ &nbsp;Live demo — **https://sessionsdeployed.vercel.app**
 
-> Stack: React (Vite) · Django + DRF · PostgreSQL · Google OAuth + JWT · Docker
-> Compose · nginx. Built in small commits — `git log --oneline` shows the order.
->
-> Docs: [DECISIONS.md](DECISIONS.md) · [DEBUGGING.md](DEBUGGING.md) ·
-> [PROMPT_LOG.md](PROMPT_LOG.md)
+<sub>API: [sessions-backend.onrender.com](https://sessions-backend.onrender.com/api/health/) · first request after ~15 min idle takes ~40 s (Render free tier waking up)</sub>
+
+> Sign in with **Google**, or with the **email box** — any address, no password
+> (`reviewer@example.com` is pre-filled; the "sign in as a host" checkbox gives
+> you creator abilities). The catalog loads without signing in.
+
+---
+
+A small marketplace where **Creators** publish bookable sessions and **Users**
+browse and book them. Booking is the interesting part: it is concurrency-safe, so
+a `capacity = 1` session can never be booked twice even under simultaneous
+requests.
+
+| | |
+|---|---|
+| **Frontend** | React (Vite) — Vercel |
+| **Backend** | Django + DRF + SimpleJWT — Render (Docker) |
+| **Database** | PostgreSQL — Render managed |
+| **Auth** | Google OAuth → backend-issued JWT (+ passwordless email for the demo) |
+| **Local** | `docker compose up --build` → frontend + backend + Postgres + nginx |
+| **Docs** | [DECISIONS.md](DECISIONS.md) · [DEBUGGING.md](DEBUGGING.md) · [PROMPT_LOG.md](PROMPT_LOG.md) |
+
+Built in small commits — `git log --oneline` shows the order.
 
 ---
 
