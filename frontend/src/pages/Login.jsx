@@ -159,16 +159,17 @@ export default function Login() {
                 <span>or</span>
               </div>
               <div className="auth-google">
-                <GoogleLogin
-                  onSuccess={onGoogle}
-                  onError={() =>
-                    setError('Google sign-in was cancelled or failed.')
-                  }
-                  shape="pill"
-                  size="large"
-                  width="320"
-                  text="continue_with"
-                />
+                <div className="auth-google-clip">
+                  <GoogleLogin
+                    onSuccess={onGoogle}
+                    onError={() =>
+                      setError('Google sign-in was cancelled or failed.')
+                    }
+                    shape="pill"
+                    size="large"
+                    text="continue_with"
+                  />
+                </div>
               </div>
             </>
           )}

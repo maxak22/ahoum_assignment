@@ -1227,6 +1227,13 @@ hr {
   justify-content: center;
   min-height: 44px;
 }
+/* Force the GIS button to a clean pill regardless of how it renders internally */
+.auth-google-clip {
+  border-radius: 999px;
+  overflow: hidden;
+  line-height: 0;
+  width: max-content;
+}
 .auth-divider {
   display: flex;
   align-items: center;

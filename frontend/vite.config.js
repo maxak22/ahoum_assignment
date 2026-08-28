@@ -17,5 +17,9 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:80',
     },
+    // lets the Google sign-in popup communicate back to the page
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+    },
   },
 })
