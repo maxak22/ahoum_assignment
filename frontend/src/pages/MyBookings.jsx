@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, apiErrorMessage } from '../api/client.js'
+import { api, apiErrorMessage, asList } from '../api/client.js'
 import { useToast } from '../components/ToastContext.jsx'
 import { formatDateTime } from '../lib/format.js'
 import DateBadge from '../components/DateBadge.jsx'
@@ -61,7 +61,7 @@ export default function MyBookings() {
     setError('')
     api
       .get('/bookings/')
-      .then(({ data }) => setBookings(data))
+      .then(({ data }) => setBookings(asList(data)))
       .catch((err) => setError(apiErrorMessage(err)))
   }, [])
 

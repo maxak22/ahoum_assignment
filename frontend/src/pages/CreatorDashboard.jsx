@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, apiErrorMessage } from '../api/client.js'
+import { api, apiErrorMessage, asList } from '../api/client.js'
 import { useToast } from '../components/ToastContext.jsx'
 import { formatDateTime } from '../lib/format.js'
 import { SkeletonRows } from '../components/Skeleton.jsx'
@@ -16,7 +16,7 @@ export default function CreatorDashboard() {
     setError('')
     api
       .get('/sessions/?mine=1')
-      .then(({ data }) => setSessions(data))
+      .then(({ data }) => setSessions(asList(data)))
       .catch((err) => setError(apiErrorMessage(err)))
   }, [])
 

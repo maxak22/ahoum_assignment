@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, apiErrorMessage } from '../api/client.js'
+import { api, apiErrorMessage, asList } from '../api/client.js'
 import { useAuth } from '../auth/AuthContext.jsx'
 import SessionCard from '../components/SessionCard.jsx'
 import { SkeletonCards } from '../components/Skeleton.jsx'
@@ -17,7 +17,7 @@ export default function Catalog() {
     let alive = true
     api
       .get('/sessions/')
-      .then(({ data }) => alive && setSessions(data))
+      .then(({ data }) => alive && setSessions(asList(data)))
       .catch((err) => alive && setError(apiErrorMessage(err)))
     return () => {
       alive = false

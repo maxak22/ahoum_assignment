@@ -38,7 +38,21 @@ api.interceptors.request.use((config) => {
 let refreshRequest = null
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // If the API proxy is misconfigured, requests fall through to the SPA and
+    // come back as index.html with a 200. Treat that as a hard error rather
+    // than letting an HTML string reach a component.
+    const contentType = response.headers?.['content-type'] || ''
+    if (typeof response.data === 'string' && contentType.includes('text/html')) {
+      return Promise.reject(
+        new Error(
+          'The API returned HTML instead of JSON. The /api proxy is likely ' +
+            'misconfigured (check vercel.json / VITE_API_BASE_URL).',
+        ),
+      )
+    }
+    return response
+  },
   async (error) => {
     const { response, config } = error
     if (!response || response.status !== 401 || !config || config._retried) {
@@ -71,6 +85,15 @@ api.interceptors.response.use(
     }
   },
 )
+
+// Coerce a list response to an array. Handles a plain array, a DRF-paginated
+// { results: [...] }, and — defensively — anything unexpected (e.g. an HTML
+// error page from a misbehaving proxy) so a bad response can't crash a page.
+export function asList(data) {
+  if (Array.isArray(data)) return data
+  if (data && Array.isArray(data.results)) return data.results
+  return []
+}
 
 // Turn a DRF error payload into a readable string.
 export function apiErrorMessage(error, fallback = 'Something went wrong.') {
