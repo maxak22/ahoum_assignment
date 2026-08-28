@@ -1,8 +1,11 @@
+from django.conf import settings
+from django.http import Http404
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .models import User
 from .serializers import GoogleLoginSerializer, UserSerializer
 from .services import (
     GoogleAuthError,
@@ -39,6 +42,39 @@ class GoogleLoginView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        return Response({**issue_tokens(user), "user": UserSerializer(user).data})
+
+
+class DevLoginView(APIView):
+    """
+    POST { email } -> { access, refresh, user }   (DEBUG builds only)
+
+    Lets a reviewer click through the UI without configuring a real Google
+    OAuth client. Returns 404 when DEBUG is off, so it cannot be used in a
+    deployed environment.
+    """
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        if not settings.DEBUG:
+            raise Http404()
+
+        email = (request.data.get("email") or "").strip().lower()
+        if not email:
+            return Response({"detail": "email is required."}, status=400)
+
+        is_creator = bool(request.data.get("is_creator", False))
+        user, _ = User.objects.get_or_create(
+            email=email,
+            defaults={
+                "username": email.split("@")[0],
+                "google_sub": f"dev-{email}",
+                "full_name": email.split("@")[0].replace(".", " ").title(),
+                "is_creator": is_creator,
+            },
+        )
         return Response({**issue_tokens(user), "user": UserSerializer(user).data})
 
 

@@ -74,6 +74,25 @@ class AuthTests(APITestCase):
         self.assertEqual(res.data["role"], "creator")
         self.assertTrue(User.objects.get().is_creator)
 
+    def test_dev_login_works_when_debug_is_on(self):
+        with override_settings(DEBUG=True):
+            res = self.client.post(
+                reverse("auth-dev-login"),
+                {"email": "reviewer@example.com", "is_creator": True},
+                format="json",
+            )
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("access", res.data)
+        self.assertTrue(res.data["user"]["is_creator"])
+
+    def test_dev_login_is_404_when_debug_is_off(self):
+        with override_settings(DEBUG=False):
+            res = self.client.post(
+                reverse("auth-dev-login"), {"email": "x@example.com"}, format="json"
+            )
+        self.assertEqual(res.status_code, 404)
+        self.assertEqual(User.objects.count(), 0)
+
     @patch("accounts.services.google_id_token.verify_oauth2_token")
     def test_me_cannot_change_email_or_role_directly(self, mock_verify):
         mock_verify.return_value = VERIFIED_CLAIMS
