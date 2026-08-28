@@ -91,9 +91,7 @@ export default function Layout({ children }) {
 
       <main className="content">{children}</main>
 
-      <footer className="footer">
-        Sessions Marketplace · a demo of concurrency-safe booking
-      </footer>
+      <footer className="footer">Sessions · a booking marketplace</footer>
     </div>
   )
 }

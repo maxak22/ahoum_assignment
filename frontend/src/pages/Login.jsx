@@ -56,32 +56,33 @@ export default function Login() {
 
         <div className="auth-brand-body">
           <h1>
-            Small groups.
+            Book an hour
             <br />
-            Real seats.
+            with someone
             <br />
-            <em>No double-bookings.</em>
+            worth learning from.
           </h1>
+          <div className="auth-rule" />
           <p>
-            A marketplace for mentoring, mock interviews and workshops — where the
-            last seat can only be sold once.
+            Coaching, lessons, mock interviews, office hours — small sessions with
+            real people and a real seat count.
           </p>
 
           <ul className="auth-points">
             <li>Browse and book public sessions in seconds</li>
-            <li>Capacity enforced by the database, not a guess</li>
-            <li>Become a creator and host your own</li>
+            <li>Every session has limited, honest capacity</li>
+            <li>Switch to host mode and run your own</li>
           </ul>
         </div>
 
         <figure className="auth-preview" aria-hidden="true">
           <div className="ap-badge">
-            <span>SEP</span>
-            <strong>15</strong>
+            <span>SAT</span>
+            <strong>12</strong>
           </div>
           <div className="ap-body">
-            <strong>Deep Dive: Postgres Locking</strong>
-            <span>Tue 10:30 PM · 90 min</span>
+            <strong>Conversational Spanish · 1-on-1</strong>
+            <span>Sat 9:00 AM · 45 min</span>
             <div className="ap-meter">
               <i />
             </div>
@@ -89,7 +90,7 @@ export default function Login() {
           </div>
         </figure>
 
-        <p className="auth-brand-foot">Concurrency-safe booking demo</p>
+        <p className="auth-brand-foot">A booking marketplace</p>
       </aside>
 
       <main className="auth-form-wrap">

@@ -42,13 +42,14 @@ export default function Catalog() {
   return (
     <div>
       <section className="hero">
-        <h1>Book time with people who know their stuff.</h1>
+        <h1>Find your next session.</h1>
         <p className="muted">
-          Mentoring, mock interviews, and workshops — small groups, real seats.
+          Coaching, lessons, mock interviews and office hours — hosted by real
+          people, with a real seat count.
         </p>
         {user?.is_creator && (
           <Link className="button" to="/sessions/new">
-            + Host a session
+            Host a session
           </Link>
         )}
       </section>

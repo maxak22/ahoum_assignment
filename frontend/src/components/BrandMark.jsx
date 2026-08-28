@@ -1,24 +1,19 @@
-export default function BrandMark({ size = 28 }) {
+// Monoline mark — inherits currentColor so it adapts to wherever it sits.
+// Two rules inside a rounded square; the shorter lower one nods at "one seat taken".
+export default function BrandMark({ size = 24 }) {
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 32 32"
+      viewBox="0 0 24 24"
       fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
       aria-hidden="true"
-      className="brand-mark-svg"
     >
-      <rect width="32" height="32" rx="9" fill="url(#bm-g)" />
-      <rect x="7" y="8.5" width="18" height="4.6" rx="2.3" fill="#fff" opacity="0.45" />
-      <rect x="7" y="15.7" width="18" height="4.6" rx="2.3" fill="#fff" opacity="0.28" />
-      <rect x="7" y="15.7" width="10.5" height="4.6" rx="2.3" fill="#fff" />
-      <defs>
-        <linearGradient id="bm-g" x1="2" y1="0" x2="30" y2="32" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#6366F1" />
-          <stop offset="0.55" stopColor="#8B5CF6" />
-          <stop offset="1" stopColor="#22D3EE" />
-        </linearGradient>
-      </defs>
+      <rect x="2.4" y="2.4" width="19.2" height="19.2" rx="6" />
+      <line x1="7" y1="9.6" x2="17" y2="9.6" strokeLinecap="round" />
+      <line x1="7" y1="14.4" x2="12.6" y2="14.4" strokeLinecap="round" />
     </svg>
   )
 }
