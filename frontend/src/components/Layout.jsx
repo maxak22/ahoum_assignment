@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { NavLink, Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext.jsx'
 import Avatar from './Avatar.jsx'
+import BrandMark from './BrandMark.jsx'
 
 export default function Layout({ children }) {
   const { user, logout } = useAuth()
@@ -28,7 +29,7 @@ export default function Layout({ children }) {
     <div className="app">
       <header className="topbar">
         <Link to="/" className="brand">
-          <span className="brand-mark" aria-hidden="true" />
+          <BrandMark size={26} />
           Sessions
         </Link>
 
