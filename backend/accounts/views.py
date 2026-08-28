@@ -47,18 +47,18 @@ class GoogleLoginView(APIView):
 
 class DevLoginView(APIView):
     """
-    POST { email } -> { access, refresh, user }   (DEBUG builds only)
+    POST { email, is_creator } -> { access, refresh, user }
 
-    Lets a reviewer click through the UI without configuring a real Google
-    OAuth client. Returns 404 when DEBUG is off, so it cannot be used in a
-    deployed environment.
+    Passwordless email sign-in so a reviewer can click through the UI without a
+    Google account. Gated by settings.ALLOW_EMAIL_LOGIN (defaults to DEBUG) so
+    it's off unless explicitly turned on; returns 404 when disabled.
     """
 
     authentication_classes = []
     permission_classes = [AllowAny]
 
     def post(self, request):
-        if not settings.DEBUG:
+        if not settings.ALLOW_EMAIL_LOGIN:
             raise Http404()
 
         email = (request.data.get("email") or "").strip().lower()

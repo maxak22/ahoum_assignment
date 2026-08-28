@@ -7,6 +7,14 @@ import BrandMark from '../components/BrandMark.jsx'
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
+// Email (passwordless) sign-in is shown when: explicitly enabled for this
+// deploy, running the dev server, or Google isn't configured at all. The
+// backend gates the endpoint itself with ALLOW_EMAIL_LOGIN.
+const emailLoginEnabled =
+  import.meta.env.VITE_ENABLE_EMAIL_LOGIN === '1' ||
+  import.meta.env.DEV ||
+  !googleClientId
+
 export default function Login() {
   return (
     <GoogleOAuthProvider clientId={googleClientId}>
@@ -137,47 +145,58 @@ function LoginView() {
             </p>
           )}
 
-          <form className="auth-email" onSubmit={onEmail}>
-            <label>
-              Email
-              <input
-                type="email"
-                value={email}
-                required
-                autoComplete="email"
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </label>
-            <label className="checkbox">
-              <input
-                type="checkbox"
-                checked={asCreator}
-                onChange={(e) => setAsCreator(e.target.checked)}
-              />
-              Sign in as a host (you can change this later)
-            </label>
-            <button type="submit" className="block" disabled={busy}>
-              {busy ? 'Signing in…' : 'Continue'}
-            </button>
-          </form>
-
-          {googleClientId && googleReady && (
-            <>
-              <div className="auth-divider">
-                <span>or</span>
-              </div>
-              <div className="auth-google">
-                <GoogleLogin
-                  onSuccess={onGoogle}
-                  onError={() =>
-                    setError('Google sign-in was cancelled or failed.')
-                  }
-                  theme="outline"
-                  shape="rectangular"
-                  size="large"
-                  text="continue_with"
-                  width="330"
+          {emailLoginEnabled && (
+            <form className="auth-email" onSubmit={onEmail}>
+              <label>
+                Email
+                <input
+                  type="email"
+                  value={email}
+                  required
+                  autoComplete="email"
+                  onChange={(e) => setEmail(e.target.value)}
                 />
+              </label>
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={asCreator}
+                  onChange={(e) => setAsCreator(e.target.checked)}
+                />
+                Sign in as a host (you can change this later)
+              </label>
+              <button type="submit" className="block" disabled={busy}>
+                {busy ? 'Signing in…' : 'Continue'}
+              </button>
+            </form>
+          )}
+
+          {googleClientId && (
+            <>
+              {emailLoginEnabled && (
+                <div className="auth-divider">
+                  <span>or</span>
+                </div>
+              )}
+              <div className="auth-google">
+                {googleReady ? (
+                  <GoogleLogin
+                    onSuccess={onGoogle}
+                    onError={() =>
+                      setError('Google sign-in was cancelled or failed.')
+                    }
+                    theme="outline"
+                    shape="rectangular"
+                    size="large"
+                    text="continue_with"
+                    width="330"
+                  />
+                ) : (
+                  <p className="muted small center">
+                    Loading Google sign-in… if it doesn’t appear, your browser
+                    may be blocking it.
+                  </p>
+                )}
               </div>
             </>
           )}

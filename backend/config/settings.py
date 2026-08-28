@@ -194,6 +194,10 @@ if _platform_host:
 # The audience that Google ID tokens are verified against.
 GOOGLE_OAUTH_CLIENT_ID = env("GOOGLE_OAUTH_CLIENT_ID", "")
 
+# Passwordless email sign-in (accounts.views.DevLoginView). On by default in
+# DEBUG; set ALLOW_EMAIL_LOGIN=1 to also offer it on a deployed demo.
+ALLOW_EMAIL_LOGIN = env_bool("ALLOW_EMAIL_LOGIN", DEBUG)
+
 
 # --- CORS: allow non-simple requests + let axios read the response --------
 CORS_ALLOW_CREDENTIALS = False  # we send the JWT in a header, not a cookie

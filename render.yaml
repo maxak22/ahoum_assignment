@@ -34,6 +34,9 @@ services:
         value: "2"
       - key: SEED_DEMO_DATA
         value: "1"
+      # offer passwordless email sign-in on the demo (Google also works)
+      - key: ALLOW_EMAIL_LOGIN
+        value: "1"
       # RENDER_EXTERNAL_HOSTNAME is injected automatically and added to
       # ALLOWED_HOSTS / CSRF_TRUSTED_ORIGINS in settings.py.
       - key: DJANGO_ALLOWED_HOSTS

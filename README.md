@@ -65,7 +65,7 @@ Backend apps:
 | method | path | auth | notes |
 |---|---|---|---|
 | `POST` | `/api/auth/google/` | — | Google ID token → `{access, refresh, user}` |
-| `POST` | `/api/auth/dev-login/` | — | `DEBUG` only; `{email, is_creator}` → tokens |
+| `POST` | `/api/auth/dev-login/` | — | email sign-in; `{email, is_creator}` → tokens (gated by `ALLOW_EMAIL_LOGIN`) |
 | `POST` | `/api/auth/refresh/` | — | `{refresh}` → `{access}` |
 | `GET` `PATCH` | `/api/auth/me/` | user | read / update profile, `is_creator` toggle |
 | `GET` | `/api/sessions/` | — | public sessions (`?mine=1` → your own, needs auth) |
@@ -104,7 +104,7 @@ docker compose up --build
 
 `.env.example` leaves the Google client id blank on purpose, so the app is
 usable immediately: the sign-in page shows a **dev-login box** (email + a
-"create as creator" checkbox) that works while `DJANGO_DEBUG=1`. To use real
+"create as creator" checkbox). To use real
 Google sign-in instead, see §5.
 
 Populate the catalog with demo sessions (language, yoga, design, music,
@@ -158,7 +158,7 @@ See [.env.example](.env.example) for the full annotated list. Summary:
 |----------------------------|--------------------|------------------------------------------|
 | `POSTGRES_*`               | db, backend        | database name / credentials / host       |
 | `DJANGO_SECRET_KEY`        | backend            | Django cryptographic signing             |
-| `DJANGO_DEBUG`             | backend            | `1` for local eval (enables dev-login); `0` when shared |
+| `DJANGO_DEBUG`             | backend            | `0` for any shared/deployed env; `1` only for local dev |
 | `DJANGO_ALLOWED_HOSTS`     | backend            | host header allow-list                   |
 | `DJANGO_CSRF_TRUSTED_ORIGINS` | backend         | origins trusted for the admin login form |
 | `CORS_ALLOWED_ORIGINS`     | backend            | browser origins allowed to call the API  |
@@ -245,6 +245,7 @@ Files: [`render.yaml`](render.yaml) (backend + DB blueprint),
    |---|---|
    | `VITE_GOOGLE_CLIENT_ID` | your Google client id |
    | `VITE_API_BASE_URL` | `https://sessions-backend.onrender.com/api` (your Render host) |
+   | `VITE_ENABLE_EMAIL_LOGIN` | `1` (so the email form shows next to Google) |
 3. Deploy. Note the URL, e.g. `https://sessions-xyz.vercel.app`.
 
 ### 3. Wire the two together
@@ -254,9 +255,11 @@ Files: [`render.yaml`](render.yaml) (backend + DB blueprint),
   bearer token, not a cookie, so CORS is the only cross-origin setting needed.
 - **Google Cloud Console** → the OAuth client → **Authorized JavaScript
   origins** → add `https://sessions-xyz.vercel.app`.
-- With `DJANGO_DEBUG=0` the `dev-login` endpoint is disabled, so **Google is the
-  only sign-in in production** — make sure your Google account is a **Test user**
-  on the consent screen.
+- Sign-in options on the deployed demo:
+  - **Google** — add your account as a **Test user** on the consent screen.
+  - **Email** (passwordless) — `render.yaml` sets `ALLOW_EMAIL_LOGIN=1` and you
+    add `VITE_ENABLE_EMAIL_LOGIN=1` on Vercel, so a reviewer can sign in without
+    Google. Drop both to make it Google-only.
 
 ### Notes
 
@@ -292,7 +295,7 @@ unique indexes do not behave the same on SQLite). Current count: **43 tests**.
 
 | area | file | notable cases |
 |---|---|---|
-| auth / errors | `accounts/tests/test_auth.py` | 401 no token, 401 malformed token, **401 expired token**, OAuth failures (unverified email, invalid token), dev-login 404 when `DEBUG=0` |
+| auth / errors | `accounts/tests/test_auth.py` | 401 no token, 401 malformed token, **401 expired token**, OAuth failures (unverified email, invalid token), email-login 404 when disabled |
 | authorization | `catalog/tests/test_authorization.py` | normal user → **403** on create; creator A → **403** editing / deleting creator B's session |
 | sessions | `catalog/tests/test_sessions.py` | visibility, validation, DB `CHECK` constraints |
 | bookings | `bookings/tests/test_bookings.py` | double-book, full, started, own-session, cancel + rebook, cancel-auth |

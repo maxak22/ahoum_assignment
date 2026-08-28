@@ -192,15 +192,20 @@ all. Do we require them to set up a Google project just to see the frontend?
   `POST /api/auth/dev-login/ {email, is_creator}` upserts a user and issues the
   same JWT pair the Google flow does; `raise Http404()` when `DEBUG` is off.
 
-**Decision.** The `dev-login` endpoint. The real Google flow
-(`/api/auth/google/`) is fully implemented and used when a client id is set; the
-frontend shows the Google button then and hides the dev box. With no client id,
-the dev box appears and `dev-login` handles it. Two tests pin the gate: it works
-under `DEBUG=True`, returns `404` under `DEBUG=False`, and creates no user in
-that case.
+**Decision.** A passwordless **email sign-in** endpoint
+(`POST /api/auth/dev-login/ {email, is_creator}`) that issues the same JWT pair
+the Google flow does. The real Google flow (`/api/auth/google/`) is fully
+implemented and preferred when a client id is set.
 
-**Trade-off.** There is now an auth bypass in the codebase. It is inert in any
-non-debug environment (404, no code path reachable), but it is still a thing a
+Gating: the endpoint checks `settings.ALLOW_EMAIL_LOGIN`, which **defaults to
+`DEBUG`** but can be turned on independently. So: local `docker compose` → on;
+a locked-down deploy → off (`404`); the hosted demo → explicitly `ALLOW_EMAIL_LOGIN=1`
+so a reviewer can sign in without us sharing Google "Test user" access. The
+frontend mirrors this with `VITE_ENABLE_EMAIL_LOGIN`. Two tests pin the gate:
+works when enabled, `404` + no user created when disabled.
+
+**Trade-off.** There is now an auth bypass in the codebase. It is inert unless
+`ALLOW_EMAIL_LOGIN` is set (404, no code path reachable), but it is still a thing a
 careless deployment could expose — `.env.example` and DEBUGGING/README call this
 out explicitly. The upside is that the app is evaluable in one command with zero
 external setup.

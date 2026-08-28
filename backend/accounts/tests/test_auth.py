@@ -90,8 +90,8 @@ class AuthTests(APITestCase):
         self.assertEqual(res.data["role"], "creator")
         self.assertTrue(User.objects.get().is_creator)
 
-    def test_dev_login_works_when_debug_is_on(self):
-        with override_settings(DEBUG=True):
+    def test_email_login_works_when_enabled(self):
+        with override_settings(ALLOW_EMAIL_LOGIN=True):
             res = self.client.post(
                 reverse("auth-dev-login"),
                 {"email": "reviewer@example.com", "is_creator": True},
@@ -101,8 +101,8 @@ class AuthTests(APITestCase):
         self.assertIn("access", res.data)
         self.assertTrue(res.data["user"]["is_creator"])
 
-    def test_dev_login_is_404_when_debug_is_off(self):
-        with override_settings(DEBUG=False):
+    def test_email_login_is_404_when_disabled(self):
+        with override_settings(ALLOW_EMAIL_LOGIN=False):
             res = self.client.post(
                 reverse("auth-dev-login"), {"email": "x@example.com"}, format="json"
             )
