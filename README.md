@@ -4,7 +4,11 @@ A small marketplace where **Creators** publish bookable sessions and **Users** b
 and book them. Booking is the interesting part: it is concurrency-safe, so a
 `capacity = 1` session can never be booked twice even under simultaneous requests.
 
-> Status: built in phases. See the commit history for the order things were added.
+> Stack: React (Vite) · Django + DRF · PostgreSQL · Google OAuth + JWT · Docker
+> Compose · nginx. Built in small commits — `git log --oneline` shows the order.
+>
+> Docs: [DECISIONS.md](DECISIONS.md) · [DEBUGGING.md](DEBUGGING.md) ·
+> [PROMPT_LOG.md](PROMPT_LOG.md)
 
 ---
 
@@ -56,6 +60,22 @@ Backend apps:
 | `catalog`  | `Session` model + CRUD APIs, public browse                 |
 | `bookings` | `Booking` model + the concurrency-safe booking endpoint    |
 
+### API endpoints
+
+| method | path | auth | notes |
+|---|---|---|---|
+| `POST` | `/api/auth/google/` | — | Google ID token → `{access, refresh, user}` |
+| `POST` | `/api/auth/dev-login/` | — | `DEBUG` only; `{email, is_creator}` → tokens |
+| `POST` | `/api/auth/refresh/` | — | `{refresh}` → `{access}` |
+| `GET` `PATCH` | `/api/auth/me/` | user | read / update profile, `is_creator` toggle |
+| `GET` | `/api/sessions/` | — | public sessions (`?mine=1` → your own, needs auth) |
+| `POST` | `/api/sessions/` | **creator** | create |
+| `GET` | `/api/sessions/{id}/` | — | detail |
+| `PATCH` `PUT` `DELETE` | `/api/sessions/{id}/` | **owning creator** | 403 otherwise |
+| `POST` | `/api/sessions/{id}/book/` | user | the concurrency-safe endpoint |
+| `GET` | `/api/bookings/` | user | your bookings (`?status=active` \| `past`) |
+| `POST` | `/api/bookings/{id}/cancel/` | user (owner) | frees the seat |
+
 ### Request / auth flow
 
 1. Frontend gets a Google **ID token** via Google Identity Services.
@@ -75,15 +95,56 @@ Backend apps:
 
 ```bash
 cp .env.example .env
-# edit .env: set DJANGO_SECRET_KEY, GOOGLE_OAUTH_CLIENT_ID, VITE_GOOGLE_CLIENT_ID
+python -c "import secrets; print('DJANGO_SECRET_KEY='+secrets.token_urlsafe(50))"  # paste into .env
 docker compose up --build
-# app:      http://localhost
-# django admin: http://localhost/admin
 ```
+
+- App: **http://localhost**
+- Django admin: **http://localhost/admin** (`docker compose exec backend python manage.py createsuperuser`)
+
+`.env.example` leaves the Google client id blank on purpose, so the app is
+usable immediately: the sign-in page shows a **dev-login box** (email + a
+"create as creator" checkbox) that works while `DJANGO_DEBUG=1`. To use real
+Google sign-in instead, see §5.
+
+To seed a couple of predictable users + JWTs for API poking:
+
+```bash
+docker compose exec backend python manage.py seed_dev_users
+```
+
+### Trying the two roles
+
+1. Open http://localhost → **Sign in** → dev-login box.
+2. Sign in as `creator@example.com` with **"create as creator"** checked →
+   **Creator** tab → **New session** (capacity 1 is good for testing) → save.
+3. Open a private window (or sign out), sign in as `user@example.com`
+   (unchecked) → open that session → **Book**.
+4. Book it again → you get the 409 "already booked". As a third user, booking
+   the now-full session → 409 "fully booked". The creator can't book their own.
+5. **My bookings** → cancel → the seat frees and you can rebook.
 
 ### Option B — local dev (no Docker)
 
-_Documented in a later phase once the backend/frontend exist._
+You need Python 3.12 and a local PostgreSQL 16.
+
+```bash
+# --- backend ---
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+export DJANGO_SECRET_KEY=dev DJANGO_DEBUG=1 \
+       POSTGRES_DB=sessions_marketplace POSTGRES_USER=sessions \
+       POSTGRES_PASSWORD=sessions POSTGRES_HOST=localhost POSTGRES_PORT=5432
+createdb sessions_marketplace   # or use psql
+python manage.py migrate
+python manage.py runserver 0.0.0.0:8000
+
+# --- frontend (second terminal) ---
+cd frontend
+npm install
+npm run dev        # http://localhost:5173, proxies /api -> :8000
+```
 
 ---
 
@@ -95,30 +156,39 @@ See [.env.example](.env.example) for the full annotated list. Summary:
 |----------------------------|--------------------|------------------------------------------|
 | `POSTGRES_*`               | db, backend        | database name / credentials / host       |
 | `DJANGO_SECRET_KEY`        | backend            | Django cryptographic signing             |
-| `DJANGO_DEBUG`             | backend            | `0` in any shared environment            |
+| `DJANGO_DEBUG`             | backend            | `1` for local eval (enables dev-login); `0` when shared |
 | `DJANGO_ALLOWED_HOSTS`     | backend            | host header allow-list                   |
+| `DJANGO_CSRF_TRUSTED_ORIGINS` | backend         | origins trusted for the admin login form |
 | `CORS_ALLOWED_ORIGINS`     | backend            | browser origins allowed to call the API  |
 | `JWT_ACCESS_TOKEN_LIFETIME_MIN` / `JWT_REFRESH_TOKEN_LIFETIME_DAYS` | backend | token lifetimes |
-| `GOOGLE_OAUTH_CLIENT_ID`   | backend            | audience the ID token is verified against |
-| `VITE_GOOGLE_CLIENT_ID`    | frontend (build)   | renders the Google Sign-In button        |
+| `GOOGLE_OAUTH_CLIENT_ID`   | backend            | audience the ID token is verified against (blank → Google login disabled) |
+| `VITE_GOOGLE_CLIENT_ID`    | frontend (build)   | renders the Google button (blank → dev-login box shown) |
 | `VITE_API_BASE_URL`        | frontend (build)   | API base path (relative, behind nginx)   |
 
-Secrets live only in `.env` (git-ignored). `.env.example` holds placeholders.
+Secrets live only in `.env` (git-ignored). `.env.example` holds placeholders and
+is safe to commit.
 
 ---
 
 ## 5. Google OAuth setup
 
+Optional — skip it and use the dev-login box (§3). For real Google sign-in:
+
 1. Google Cloud Console → **APIs & Services → Credentials**.
 2. **Create Credentials → OAuth client ID → Web application**.
 3. Authorized JavaScript origins: `http://localhost` (and `http://localhost:5173`
    if you run the Vite dev server).
-4. No redirect URI is needed — we use the Google Identity Services token flow, not
-   the redirect/code flow.
-5. Copy the client id into `.env` as both `GOOGLE_OAUTH_CLIENT_ID` and
-   `VITE_GOOGLE_CLIENT_ID`.
-6. Add your Google account as a **Test user** on the OAuth consent screen while it
-   is in "Testing" mode.
+4. No redirect URI is needed — we use the Google Identity Services **token**
+   flow, not the redirect/code flow, so there is no callback URL to register.
+5. Put the client id into `.env` as **both** `GOOGLE_OAUTH_CLIENT_ID` (backend
+   verifies the token's `aud` against it) and `VITE_GOOGLE_CLIENT_ID` (frontend
+   renders the button). Rebuild: `docker compose up --build`.
+6. Add your Google account as a **Test user** on the OAuth consent screen while
+   it is in "Testing" mode.
+
+Once set, the frontend's `<GoogleLogin>` yields an ID token, `POST`s it to
+`/api/auth/google/`, and the backend verifies it (signature via Google's JWKS,
+`aud`, `iss`, `exp`, `email_verified`) before issuing our own JWT pair.
 
 ---
 
@@ -153,12 +223,15 @@ docker compose exec backend python manage.py test accounts # one app
 ```
 
 Tests run against a real PostgreSQL test database (row-level locking and partial
-unique indexes do not behave the same on SQLite). Current count: 40 tests.
+unique indexes do not behave the same on SQLite). Current count: **42 tests**.
 
-The two required authorization/error cases and more live in
-`accounts/tests/test_auth.py` (401 no token, 401 bad token, OAuth failures) and
-`catalog/tests/test_authorization.py` (normal user → 403 on create, creator A →
-403 on creator B's session / delete).
+| area | file | notable cases |
+|---|---|---|
+| auth / errors | `accounts/tests/test_auth.py` | 401 no token, 401 bad token, OAuth failures (unverified email, invalid token), dev-login 404 when `DEBUG=0` |
+| authorization | `catalog/tests/test_authorization.py` | normal user → **403** on create; creator A → **403** editing / deleting creator B's session |
+| sessions | `catalog/tests/test_sessions.py` | visibility, validation, DB `CHECK` constraints |
+| bookings | `bookings/tests/test_bookings.py` | double-book, full, started, own-session, cancel + rebook, cancel-auth |
+| concurrency | `bookings/tests/test_concurrency.py` | see §9 |
 
 ---
 
@@ -195,15 +268,45 @@ docker compose exec backend python manage.py demo_race --concurrency 20 --capaci
 
 ## 10. Known limitations
 
-_Filled in as we build. Current list:_
-
-- Consent screen stays in Google "Testing" mode; real verification is out of scope.
-- No email notifications / calendar invites on booking.
-- No pagination on the catalog yet.
-- Refresh token stored in `localStorage` (see DECISIONS.md for the trade-off).
+- **No HTTPS.** nginx serves plain HTTP on `:80`; TLS termination is out of
+  scope. `SECURE_SSL_REDIRECT` / HSTS are therefore off.
+- **Refresh token in `localStorage`** — XSS-exposed. See DECISIONS.md §1 for the
+  `httpOnly`-cookie alternative and why it wasn't chosen here.
+- **Stateless JWTs, no blacklist** — a logout or a role change only takes effect
+  when the 15-minute access token expires.
+- **`dev-login` endpoint** exists (guarded by `DJANGO_DEBUG`). Convenient for
+  evaluation; must stay disabled in a real deployment.
+- **No pagination / search / filtering** on the catalog or bookings lists.
+- **Anyone can self-promote to Creator** instantly — fine for a demo, not for a
+  real marketplace (no trust/spam controls).
+- **Booking is all-or-nothing** — no waitlist, no hold/timeout, no partial
+  group booking.
+- **No email / calendar notifications.**
+- **The concurrency test needs Postgres** — it `skipTest`s on other backends
+  rather than failing, so a misconfigured runner could silently skip it.
+- **`seats_taken` counter can drift in theory** if a booking row is deleted
+  directly in the DB (bypassing `cancel_booking`); the `CHECK` constraint bounds
+  it but doesn't repair it. A periodic reconcile job would fix that.
 
 ---
 
 ## 11. What I'd improve with another day
 
-_Filled in at the end._
+- **Move auth to `httpOnly` refresh cookies** + short-lived in-memory access
+  token, with CSRF protection on the refresh endpoint.
+- **Token blacklist** (SimpleJWT's `token_blacklist` app) so logout and bans are
+  immediate.
+- **Reconcile command / DB trigger** to keep `seats_taken` provably equal to the
+  count of active bookings, and a test that asserts the invariant after random
+  book/cancel sequences.
+- **Pagination + filtering** (`django-filter`, DRF pagination) on catalog and
+  bookings; an index on `Session.start_at` and `Booking(user, status)`.
+- **Frontend tests** — React Testing Library for the booking flow and the
+  refresh-on-401 interceptor; a Playwright happy-path.
+- **CI** — GitHub Actions running `manage.py test` (incl. the concurrency test)
+  against a Postgres service container on every push.
+- **Rate-limiting** the booking and auth endpoints (DRF throttling).
+- **Observability** — structured logging, request ids, a real `/healthz` that
+  checks the DB.
+- **Creator onboarding** — an approval step instead of an instant self-serve
+  toggle.

@@ -48,3 +48,89 @@ $ docker compose logs backend | tail
 ```
 
 Container stays up; migrations run; `/api/health/` returns 200.
+
+---
+
+## D2 — `makemigrations` says "No changes detected" after editing a model
+
+**Symptom.** In Phase 3 we added fields to `accounts/models.py`, then ran
+`docker compose exec backend python manage.py makemigrations accounts` and got:
+
+```
+No changes detected in app 'accounts'
+```
+
+The edited file was clearly on disk on the host.
+
+**Diagnosis.** At that point `docker-compose.yml` had **no bind mount** for the
+backend — the image was built with `COPY . .`, so the container was running a
+*frozen copy* of the code from image-build time. `docker compose exec` runs
+inside that container, against the frozen copy, which had the old model.
+
+**Root cause.** Editing files on the host does not change a running container
+unless the directory is bind-mounted (or the image is rebuilt).
+
+**Fix.** Added a dev bind mount and live reload to the `backend` service:
+
+```yaml
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --reload
+    volumes:
+      - ./backend:/app
+```
+
+(This is also what triggered D1.)
+
+**Verification.** After `docker compose up -d --build`, the same
+`makemigrations` command reported the new fields and wrote
+`0002_user_profile_fields.py`. Editing a view now takes effect on the next
+request without a rebuild.
+
+---
+
+## D3 — wrong error message when re-booking a full session
+
+**Symptom.** Live-testing the booking endpoint (not caught by a test): a user
+who already had an active booking for a `capacity = 1` session tried to book it
+again and got
+
+```
+409  {"detail": "This session is fully booked."}
+```
+
+Expected: `"You already have an active booking for this session."`
+
+**Diagnosis.** `book_session` relied entirely on the partial unique index to
+reject a repeat booking — there was no explicit "already booked" check. The
+checks ran in this order: started → **full** → INSERT (unique index). With
+`capacity = 1` and the user's own booking filling the single seat,
+`seats_taken >= capacity` was true, so `SessionFull` was raised before the
+INSERT that would have hit the unique index and produced the right message.
+
+**Root cause.** Correct behaviour (no double booking), wrong diagnostic — the
+two failure modes were entangled because the only double-booking guard was the
+DB constraint, reached last.
+
+**Fix.** Added an explicit early check in `bookings/services.py`, *before* the
+capacity check, purely for the message:
+
+```python
+already = Booking.objects.filter(
+    user=user, session=session, status=Booking.Status.ACTIVE
+).exists()
+if already:
+    raise AlreadyBooked()
+```
+
+The partial unique index is still the race-safe authority (the `INSERT` is still
+wrapped in `try/except IntegrityError -> AlreadyBooked`); this check just makes
+the common case say the right thing.
+
+**Verification.**
+
+```
+$ curl -s -XPOST -H "Authorization: Bearer $U1" http://localhost/api/sessions/$SID/book/
+{"detail":"You already have an active booking for this session."}   # 409
+```
+
+`bookings.tests.test_bookings` still green (11 tests); the concurrency tests
+(which race *different* users) unaffected.

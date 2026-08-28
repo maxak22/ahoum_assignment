@@ -150,3 +150,35 @@ become a Creator instantly, which is right for a demo but not for a real
 marketplace (spam, trust). Moving to `Groups` later is a migration plus swapping
 the permission classes; the API contract (`role` on the user object) would not
 change.
+
+---
+
+## 5. A `dev-login` endpoint vs. requiring real Google credentials
+
+**Problem / ambiguity.** The whole app is gated behind Google sign-in. A
+reviewer who runs `docker compose up` with no Google OAuth client configured
+can hit the API (via `seed_dev_users` tokens) but cannot click through the UI at
+all. Do we require them to set up a Google project just to see the frontend?
+
+**Options considered.**
+
+- **Require real Google OAuth.** Most faithful to the brief, but adds a
+  10-minute Cloud Console detour before anything is visible, and "Testing mode"
+  friction (adding test users).
+- **Ship a fake/mock IdP.** Overkill; another moving part to explain.
+- **A backend `dev-login` endpoint, hard-gated on `DEBUG`.**
+  `POST /api/auth/dev-login/ {email, is_creator}` upserts a user and issues the
+  same JWT pair the Google flow does; `raise Http404()` when `DEBUG` is off.
+
+**Decision.** The `dev-login` endpoint. The real Google flow
+(`/api/auth/google/`) is fully implemented and used when a client id is set; the
+frontend shows the Google button then and hides the dev box. With no client id,
+the dev box appears and `dev-login` handles it. Two tests pin the gate: it works
+under `DEBUG=True`, returns `404` under `DEBUG=False`, and creates no user in
+that case.
+
+**Trade-off.** There is now an auth bypass in the codebase. It is inert in any
+non-debug environment (404, no code path reachable), but it is still a thing a
+careless deployment could expose — `.env.example` and DEBUGGING/README call this
+out explicitly. The upside is that the app is evaluable in one command with zero
+external setup.

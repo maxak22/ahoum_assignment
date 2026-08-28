@@ -87,6 +87,37 @@ For each: tool/model · the prompt (summarised) · what was suggested · what I 
 
 ---
 
+## P4 — Phases 8-9: React frontend + Docker/nginx
+
+- **Tool / model:** Claude Code (claude-sonnet-5)
+- **Prompt (summary):** "Build the React SPA (all the listed pages, handle
+  loading/empty/error), then the frontend + nginx containers so
+  `docker compose up --build` serves everything on port 80."
+- **What was suggested:**
+  - `@react-oauth/google`'s `<GoogleLogin>` (yields the ID token our backend
+    wants); axios instance with a Bearer interceptor and a de-duped
+    refresh-on-401-then-replay interceptor.
+  - A `DEBUG`-gated `dev-login` endpoint so the UI is usable with no Google
+    setup (DECISIONS.md §5).
+  - Multi-stage frontend Dockerfile (node build → `nginx:alpine`), `VITE_*` as
+    build args because Vite inlines them.
+  - Edge nginx routing `/`→frontend, `/api|/admin|/django-static`→backend.
+  - WhiteNoise so gunicorn serves the Django admin CSS (no runserver).
+- **What I kept:** All of it.
+- **What I changed / rejected:** Changed the dev-login box visibility from
+  `import.meta.env.DEV` only to `import.meta.env.DEV || !googleClientId`, so it
+  also shows in the production Docker build when Google isn't configured — the
+  original gate defeated the point.
+- **How I verified it:** `docker compose up --build` from clean → all four
+  containers healthy; curl through nginx for `/`, `/api/health/`,
+  `/api/sessions/`, `/admin/` (302), `/django-static/admin/css/base.css` (200),
+  SPA deep-link `/sessions/3` (200 via `try_files`); full
+  login → create session → book flow through `http://localhost`; data survives
+  `docker compose down` + `up`. Backend suite still 42 passing after the
+  WhiteNoise/`STORAGES` change.
+
+---
+
 ## What AI got wrong / what I corrected
 
 1. **Entrypoint made non-executable by the bind mount.** The first Dockerfile
