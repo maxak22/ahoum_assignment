@@ -212,45 +212,46 @@ docker compose down -v           # stop AND delete the db volume (wipes data)
 
 The compose stack (§2) is one deployable unit — for a VPS you'd just run
 `docker compose up -d` behind a TLS proxy. The hosted setup below splits it:
-**frontend → Vercel** (static, global CDN), **backend + Postgres → Render**.
-nginx isn't used; Vercel serves the SPA and proxies `/api/*` to Render, so the
-app stays same-origin (no CORS, and Google's OAuth-popup COOP checks pass).
+**frontend → Vercel** (static, global CDN), **backend + Postgres → Render**. The
+SPA calls the Render API directly; `django-cors-headers` allows the Vercel
+origin.
 
 ```
-Browser ─► Vercel (SPA + /api proxy) ─► Render (Django/gunicorn) ─► Render Postgres
+Browser ─► Vercel (static SPA)  ──CORS──►  Render (Django/gunicorn) ─► Render Postgres
 ```
 
 Files: [`render.yaml`](render.yaml) (backend + DB blueprint),
-[`frontend/vercel.json`](frontend/vercel.json) (build + API proxy + SPA fallback).
+[`frontend/vercel.json`](frontend/vercel.json) (Vite build + SPA fallback).
 
 ### 1. Backend on Render
 
 1. **New → Blueprint → this repo.** Render reads `render.yaml`: a Docker web
    service (`backend/Dockerfile`) + a free PostgreSQL instance, wired by
    `DATABASE_URL`.
-2. Fill the prompted env vars — leave `CORS_ALLOWED_ORIGINS` /
-   `DJANGO_CSRF_TRUSTED_ORIGINS` as placeholders for now, set
-   `GOOGLE_OAUTH_CLIENT_ID` to your client id.
-3. First deploy runs migrations + `collectstatic` + `seed_sessions` (via
-   `SEED_DEMO_DATA=1`). Note the URL, e.g. `https://sessions-backend.onrender.com`.
+2. Prompted env vars: set `GOOGLE_OAUTH_CLIENT_ID`; leave
+   `CORS_ALLOWED_ORIGINS` / `DJANGO_CSRF_TRUSTED_ORIGINS` as `https://example.com`
+   placeholders (fixed in step 3).
+3. First deploy runs migrations + `collectstatic` + `seed_sessions`. Note the
+   URL, e.g. `https://sessions-backend.onrender.com`. Check `/api/health/`.
 4. `RENDER_EXTERNAL_HOSTNAME` is injected automatically and added to
-   `ALLOWED_HOSTS` / `CSRF_TRUSTED_ORIGINS` in `settings.py` — nothing to set.
+   `ALLOWED_HOSTS` / `CSRF_TRUSTED_ORIGINS` in `settings.py`.
 
 ### 2. Frontend on Vercel
 
-1. **New Project → this repo → Root Directory: `frontend`.** Framework
-   auto-detects as Vite.
-2. In `frontend/vercel.json`, replace `REPLACE-WITH-YOUR-BACKEND.onrender.com`
-   with your Render host and commit.
-3. Env var: `VITE_GOOGLE_CLIENT_ID` = your Google client id. (`VITE_API_BASE_URL`
-   is unset → defaults to `/api`, which Vercel proxies to Render.)
-4. Deploy. Note the URL, e.g. `https://sessions-xyz.vercel.app`.
+1. **New Project → this repo → Root Directory: `frontend`** (Framework
+   auto-detects as Vite).
+2. Environment variables:
+   | name | value |
+   |---|---|
+   | `VITE_GOOGLE_CLIENT_ID` | your Google client id |
+   | `VITE_API_BASE_URL` | `https://sessions-backend.onrender.com/api` (your Render host) |
+3. Deploy. Note the URL, e.g. `https://sessions-xyz.vercel.app`.
 
 ### 3. Wire the two together
 
-- **Render** → set `CORS_ALLOWED_ORIGINS` and `DJANGO_CSRF_TRUSTED_ORIGINS` to
-  the Vercel URL (`https://sessions-xyz.vercel.app`), redeploy. (CORS isn't
-  strictly needed with the proxy, but it's correct hygiene.)
+- **Render** → set `CORS_ALLOWED_ORIGINS` = your Vercel URL
+  (`https://sessions-xyz.vercel.app`, no trailing slash) → redeploy. Auth is a
+  bearer token, not a cookie, so CORS is the only cross-origin setting needed.
 - **Google Cloud Console** → the OAuth client → **Authorized JavaScript
   origins** → add `https://sessions-xyz.vercel.app`.
 - With `DJANGO_DEBUG=0` the `dev-login` endpoint is disabled, so **Google is the

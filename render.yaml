@@ -38,7 +38,9 @@ services:
       # ALLOWED_HOSTS / CSRF_TRUSTED_ORIGINS in settings.py.
       - key: DJANGO_ALLOWED_HOSTS
         value: "localhost,127.0.0.1"
-      # set these two to your Vercel URL, e.g. https://sessions-xyz.vercel.app
+      # set CORS_ALLOWED_ORIGINS to your Vercel URL after deploying the frontend
+      # (https://sessions-xyz.vercel.app). CSRF isn't used by the JWT API but the
+      # admin form needs it — the Render host is added automatically in settings.
       - key: CORS_ALLOWED_ORIGINS
         sync: false
       - key: DJANGO_CSRF_TRUSTED_ORIGINS

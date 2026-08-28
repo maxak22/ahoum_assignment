@@ -173,3 +173,38 @@ content-encoding: gzip
 ```
 
 react-vendor chunk over the wire: 165 KB → 54 KB.
+
+---
+
+## D5 — deployed SPA crashes: `t.filter is not a function`
+
+**Symptom.** Frontend on Vercel, backend on Render. The catalog page threw
+`TypeError: t.filter is not a function` in a `useMemo`. `curl` of
+`https://<app>.vercel.app/api/health/` and `/api/sessions/` returned the SPA's
+`index.html` with a `200`, not JSON from Render.
+
+**Diagnosis.** `Catalog` does `sessions.filter(...)`; `sessions` had been set to
+the string `"<!doctype html>..."`. So `GET /api/sessions/` resolved `200` with an
+HTML body — the request never reached the backend.
+
+**Root cause.** `frontend/vercel.json` used a `rewrites` rule to proxy
+`/api/:path*` to the Render URL. Vercel did **not** apply it — every `/api/*`
+path fell through to the SPA catch-all (`/(.*) → /index.html`). Vercel's
+rewrites to an external host proved unreliable next to a catch-all rewrite.
+
+**Fix.** Dropped the proxy. The SPA now calls the backend directly via
+`VITE_API_BASE_URL=https://<backend>.onrender.com/api`, and `django-cors-headers`
+(already installed) allows the Vercel origin via `CORS_ALLOWED_ORIGINS`. Auth is
+a bearer token, not a cookie, so CORS is the only cross-origin setting needed.
+
+Defensive follow-ups so a bad response can't white-screen a page again:
+`asList(data)` coerces list endpoints to an array, and the axios response
+interceptor rejects any `200` whose body is an HTML string.
+
+**Verification.**
+
+```
+$ curl -s https://<backend>.onrender.com/api/sessions/ | head -c 40
+[{"id": 1, "title": "Conversational Spanish
+# app loads the catalog; no console error
+```
