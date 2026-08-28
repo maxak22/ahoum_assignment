@@ -89,14 +89,14 @@ export default function SessionForm({ mode }) {
 
   return (
     <div className="narrow">
-      <p>
-        <Link to="/dashboard">← Your sessions</Link>
-      </p>
+      <Link to="/dashboard" className="back-link">
+        ← Your sessions
+      </Link>
       <h1>{isEdit ? 'Edit session' : 'New session'}</h1>
 
       <ErrorNote>{error}</ErrorNote>
 
-      <form onSubmit={submit}>
+      <form className="panel" onSubmit={submit}>
         <label>
           Title
           <input value={form.title} onChange={set('title')} required />

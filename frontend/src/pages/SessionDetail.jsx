@@ -36,7 +36,7 @@ export default function SessionDetail() {
     setBusy(true)
     try {
       await api.post(`/sessions/${id}/book/`)
-      setNotice('Booked! See it under My bookings.')
+      setNotice('Booked. Find it under My bookings.')
       load()
     } catch (err) {
       setActionError(apiErrorMessage(err, 'Could not book this session.'))
@@ -54,51 +54,59 @@ export default function SessionDetail() {
 
   return (
     <article className="narrow">
-      <p>
-        <Link to="/">← All sessions</Link>
-      </p>
+      <Link to="/" className="back-link">
+        ← All sessions
+      </Link>
       <h1>{session.title}</h1>
-      <p className="muted">
-        {formatDateTime(session.start_at)} · {session.duration_minutes} min ·
-        hosted by {session.creator?.full_name || session.creator?.email}
-      </p>
 
-      <p>{session.description || <span className="muted">No description.</span>}</p>
+      <div className="detail-meta">
+        <span>{formatDateTime(session.start_at)}</span>
+        <span>{session.duration_minutes} min</span>
+        <span>
+          Hosted by {session.creator?.full_name || session.creator?.email}
+        </span>
+      </div>
 
-      <p>
-        <strong>
+      <div className="panel">
+        <p style={{ marginBottom: session.description ? 16 : 0 }}>
+          {session.description || (
+            <span className="muted">No description provided.</span>
+          )}
+        </p>
+
+        <p className="seat-line">
           {session.remaining_seats > 0
             ? `${session.remaining_seats} of ${session.capacity} seats left`
             : 'Fully booked'}
-        </strong>
-        {session.has_started && ' · already started'}
-      </p>
-
-      {notice && <p className="success">{notice}</p>}
-      <ErrorNote>{actionError}</ErrorNote>
-
-      {!user && (
-        <p className="muted">
-          <Link to="/login">Sign in</Link> to book this session.
+          {session.has_started && ' · already started'}
         </p>
-      )}
-      {isOwner && (
-        <p className="muted">
-          You host this session.{' '}
-          <Link to={`/sessions/${session.id}/edit`}>Edit it</Link>.
-        </p>
-      )}
-      {user && !isOwner && (
-        <button onClick={book} disabled={!canBook || busy}>
-          {busy
-            ? 'Booking…'
-            : session.has_started
-              ? 'Session has started'
-              : session.remaining_seats > 0
-                ? 'Book this session'
-                : 'Full'}
-        </button>
-      )}
+
+        {notice && <p className="success">{notice}</p>}
+        <ErrorNote>{actionError}</ErrorNote>
+
+        {!user && (
+          <p className="muted" style={{ margin: 0 }}>
+            <Link to="/login">Sign in</Link> to book this session.
+          </p>
+        )}
+        {isOwner && (
+          <p className="muted" style={{ margin: 0 }}>
+            You host this session ·{' '}
+            <Link to={`/sessions/${session.id}/edit`}>edit it</Link>
+          </p>
+        )}
+        {user && !isOwner && (
+          <button onClick={book} disabled={!canBook || busy}>
+            {busy
+              ? 'Booking…'
+              : session.has_started
+                ? 'Session has started'
+                : session.remaining_seats > 0
+                  ? 'Book this session'
+                  : 'Fully booked'}
+          </button>
+        )}
+      </div>
     </article>
   )
 }

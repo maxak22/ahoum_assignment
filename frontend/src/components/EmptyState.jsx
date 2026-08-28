@@ -1,3 +1,3 @@
 export default function EmptyState({ children }) {
-  return <p className="muted empty">{children}</p>
+  return <div className="empty">{children}</div>
 }

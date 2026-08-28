@@ -45,32 +45,37 @@ export default function Login() {
   }
 
   return (
-    <div className="narrow">
-      <h1>Sign in</h1>
+    <div className="login-hero">
+      <p className="eyebrow">Sessions Marketplace</p>
+      <h1>Welcome</h1>
       <p className="muted">
-        Sign in with Google to book sessions or publish your own.
+        Sign in to book sessions or publish your own.
       </p>
 
-      <ErrorNote>{error}</ErrorNote>
+      <div className="panel" style={{ marginTop: 24 }}>
+        <ErrorNote>{error}</ErrorNote>
 
-      {googleClientId ? (
-        <div className="login-google">
-          <GoogleLogin
-            onSuccess={handleGoogleSuccess}
-            onError={() => setError('Google sign-in was cancelled or failed.')}
-          />
-        </div>
-      ) : (
-        <p className="warn">
-          <code>VITE_GOOGLE_CLIENT_ID</code> is not set, so the Google button is
-          hidden. Set it in <code>.env</code> and rebuild, or use the dev login
-          below.
-        </p>
-      )}
+        {googleClientId ? (
+          <div className="login-google">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => setError('Google sign-in was cancelled or failed.')}
+              shape="pill"
+              size="large"
+              text="continue_with"
+            />
+          </div>
+        ) : (
+          <p className="warn">
+            <code>VITE_GOOGLE_CLIENT_ID</code> is not set — the Google button is
+            hidden. Use the dev login below.
+          </p>
+        )}
 
-      {(import.meta.env.DEV || !googleClientId) && (
-        <DevLoginBox busy={busy} onSubmit={handleDevLogin} />
-      )}
+        {(import.meta.env.DEV || !googleClientId) && (
+          <DevLoginBox busy={busy} onSubmit={handleDevLogin} />
+        )}
+      </div>
     </div>
   )
 }
@@ -87,9 +92,10 @@ function DevLoginBox({ busy, onSubmit }) {
         onSubmit(email.trim(), isCreator)
       }}
     >
-      <p className="muted small">
-        Dev login (only in <code>npm run dev</code>, backend must have{' '}
-        <code>DEBUG=1</code>)
+      <p className="eyebrow">Dev login</p>
+      <p className="muted small" style={{ margin: 0 }}>
+        Only in <code>npm run dev</code> or with no Google client id. Backend
+        needs <code>DEBUG=1</code>.
       </p>
       <label>
         Email
@@ -106,10 +112,10 @@ function DevLoginBox({ busy, onSubmit }) {
           checked={isCreator}
           onChange={(e) => setIsCreator(e.target.checked)}
         />
-        Create as creator
+        Create as a creator
       </label>
       <button type="submit" disabled={busy}>
-        {busy ? 'Signing in…' : 'Dev sign in'}
+        {busy ? 'Signing in…' : 'Continue'}
       </button>
     </form>
   )

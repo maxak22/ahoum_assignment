@@ -14,10 +14,13 @@ export default function Layout({ children }) {
     <div className="app">
       <header className="topbar">
         <Link to="/" className="brand">
-          Sessions Marketplace
+          <span className="brand-mark" aria-hidden="true" />
+          Sessions
         </Link>
         <nav>
-          <NavLink to="/">Catalog</NavLink>
+          <NavLink to="/" end>
+            Catalog
+          </NavLink>
           {user && <NavLink to="/bookings">My bookings</NavLink>}
           {user?.is_creator && <NavLink to="/dashboard">Creator</NavLink>}
           {user && <NavLink to="/profile">Profile</NavLink>}
@@ -26,16 +29,23 @@ export default function Layout({ children }) {
           {user ? (
             <>
               <span className="muted small">{user.email}</span>
-              <button className="link-button" onClick={handleLogout}>
+              <button className="secondary" onClick={handleLogout}>
                 Sign out
               </button>
             </>
           ) : (
-            <NavLink to="/login">Sign in</NavLink>
+            <NavLink to="/login" className="button">
+              Sign in
+            </NavLink>
           )}
         </div>
       </header>
+
       <main className="content">{children}</main>
+
+      <footer className="footer">
+        Sessions Marketplace · a small demo of concurrency-safe booking
+      </footer>
     </div>
   )
 }

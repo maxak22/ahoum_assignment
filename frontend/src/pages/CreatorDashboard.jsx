@@ -56,41 +56,43 @@ export default function CreatorDashboard() {
           You have not created any sessions yet.
         </EmptyState>
       ) : (
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Title</th>
-              <th>Starts</th>
-              <th>Booked</th>
-              <th>Visibility</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {sessions.map((s) => (
-              <tr key={s.id}>
-                <td>
-                  <Link to={`/sessions/${s.id}`}>{s.title}</Link>
-                </td>
-                <td>{formatDateTime(s.start_at)}</td>
-                <td>
-                  {s.seats_taken} / {s.capacity}
-                </td>
-                <td>{s.is_public ? 'Public' : 'Private'}</td>
-                <td className="actions">
-                  <Link to={`/sessions/${s.id}/edit`}>Edit</Link>
-                  <button
-                    className="link-button danger"
-                    disabled={busyId === s.id}
-                    onClick={() => remove(s.id)}
-                  >
-                    Delete
-                  </button>
-                </td>
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Starts</th>
+                <th>Booked</th>
+                <th>Visibility</th>
+                <th />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {sessions.map((s) => (
+                <tr key={s.id}>
+                  <td>
+                    <Link to={`/sessions/${s.id}`}>{s.title}</Link>
+                  </td>
+                  <td>{formatDateTime(s.start_at)}</td>
+                  <td>
+                    {s.seats_taken} / {s.capacity}
+                  </td>
+                  <td>{s.is_public ? 'Public' : 'Private'}</td>
+                  <td className="actions">
+                    <Link to={`/sessions/${s.id}/edit`}>Edit</Link>
+                    <button
+                      className="link-button danger"
+                      disabled={busyId === s.id}
+                      onClick={() => remove(s.id)}
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )

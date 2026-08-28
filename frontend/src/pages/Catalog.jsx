@@ -20,13 +20,25 @@ export default function Catalog() {
     }
   }, [])
 
-  if (error) return <ErrorNote>{error}</ErrorNote>
-  if (!sessions) return <Loading label="Loading sessions…" />
-
   return (
     <div>
-      <h1>Sessions</h1>
-      {sessions.length === 0 ? (
+      <div className="page-head">
+        <div>
+          <p className="eyebrow">Browse</p>
+          <h1>Upcoming sessions</h1>
+        </div>
+        {Array.isArray(sessions) && sessions.length > 0 && (
+          <span className="muted small">
+            {sessions.length} session{sessions.length === 1 ? '' : 's'}
+          </span>
+        )}
+      </div>
+
+      {error ? (
+        <ErrorNote>{error}</ErrorNote>
+      ) : !sessions ? (
+        <Loading label="Loading sessions…" />
+      ) : sessions.length === 0 ? (
         <EmptyState>No public sessions yet. Check back soon.</EmptyState>
       ) : (
         <ul className="card-list">
