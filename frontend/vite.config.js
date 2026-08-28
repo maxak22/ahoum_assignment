@@ -8,6 +8,10 @@ import react from '@vitejs/plugin-react'
 // http://localhost:8000.
 export default defineConfig({
   plugins: [react()],
+  // Read the repo-root .env (the same file docker compose uses) so
+  // VITE_GOOGLE_CLIENT_ID / VITE_API_BASE_URL only live in one place.
+  // Only VITE_-prefixed vars are ever exposed to the client bundle.
+  envDir: '..',
   server: {
     port: 5173,
     proxy: {
