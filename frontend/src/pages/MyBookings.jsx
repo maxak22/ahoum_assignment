@@ -1,15 +1,60 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, apiErrorMessage } from '../api/client.js'
+import { useToast } from '../components/ToastContext.jsx'
 import { formatDateTime } from '../lib/format.js'
-import Loading from '../components/Loading.jsx'
+import DateBadge from '../components/DateBadge.jsx'
+import { SkeletonRows } from '../components/Skeleton.jsx'
 import ErrorNote from '../components/ErrorNote.jsx'
-import EmptyState from '../components/EmptyState.jsx'
+
+function BookingRow({ booking, onCancel, busy }) {
+  const s = booking.session
+  const cancellable = !booking.is_past && booking.status === 'active'
+  return (
+    <li className="row">
+      <div className="row-main">
+        <DateBadge iso={s.start_at} />
+        <div>
+          <Link to={`/sessions/${s.id}`} className="row-title">
+            {s.title}
+          </Link>
+          <p className="muted small">{formatDateTime(s.start_at)}</p>
+        </div>
+      </div>
+      <div className="row-aside">
+        <span
+          className={
+            booking.status === 'cancelled'
+              ? 'tag'
+              : booking.is_past
+                ? 'tag'
+                : 'tag tag-ok'
+          }
+        >
+          {booking.status === 'cancelled'
+            ? 'Cancelled'
+            : booking.is_past
+              ? 'Past'
+              : 'Confirmed'}
+        </span>
+        {cancellable && (
+          <button
+            className="secondary"
+            disabled={busy}
+            onClick={() => onCancel(booking.id)}
+          >
+            {busy ? 'Cancelling…' : 'Cancel'}
+          </button>
+        )}
+      </div>
+    </li>
+  )
+}
 
 export default function MyBookings() {
+  const toast = useToast()
   const [bookings, setBookings] = useState(null)
   const [error, setError] = useState('')
-  const [actionError, setActionError] = useState('')
   const [busyId, setBusyId] = useState(null)
 
   const load = useCallback(() => {
@@ -23,73 +68,65 @@ export default function MyBookings() {
   useEffect(load, [load])
 
   const cancel = async (bookingId) => {
-    setActionError('')
     setBusyId(bookingId)
     try {
       await api.post(`/bookings/${bookingId}/cancel/`)
+      toast.success('Booking cancelled — the seat is freed')
       load()
     } catch (err) {
-      setActionError(apiErrorMessage(err, 'Could not cancel.'))
+      toast.error(apiErrorMessage(err, 'Could not cancel.'))
     } finally {
       setBusyId(null)
     }
   }
 
-  if (error) return <ErrorNote>{error}</ErrorNote>
-  if (!bookings) return <Loading label="Loading your bookings…" />
-
-  const active = bookings.filter((b) => !b.is_past && b.status === 'active')
-  const past = bookings.filter((b) => b.is_past || b.status !== 'active')
+  const active = (bookings || []).filter(
+    (b) => !b.is_past && b.status === 'active',
+  )
+  const past = (bookings || []).filter((b) => b.is_past || b.status !== 'active')
 
   return (
     <div>
+      <p className="eyebrow">Your schedule</p>
       <h1>My bookings</h1>
-      <ErrorNote>{actionError}</ErrorNote>
 
-      <h2>Active</h2>
-      {active.length === 0 ? (
-        <EmptyState>
-          No active bookings. <Link to="/">Browse sessions</Link>.
-        </EmptyState>
-      ) : (
-        <ul className="plain-list">
-          {active.map((b) => (
-            <li key={b.id} className="row">
-              <div>
-                <Link to={`/sessions/${b.session.id}`}>{b.session.title}</Link>
-                <p className="muted small">
-                  {formatDateTime(b.session.start_at)}
-                </p>
-              </div>
-              <button
-                className="danger"
-                disabled={busyId === b.id}
-                onClick={() => cancel(b.id)}
-              >
-                {busyId === b.id ? 'Cancelling…' : 'Cancel'}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      {error && <ErrorNote>{error}</ErrorNote>}
 
-      <h2>Past</h2>
-      {past.length === 0 ? (
-        <EmptyState>Nothing here yet.</EmptyState>
+      {!bookings ? (
+        <SkeletonRows count={3} />
       ) : (
-        <ul className="plain-list">
-          {past.map((b) => (
-            <li key={b.id} className="row">
-              <div>
-                <Link to={`/sessions/${b.session.id}`}>{b.session.title}</Link>
-                <p className="muted small">
-                  {formatDateTime(b.session.start_at)} ·{' '}
-                  {b.status === 'cancelled' ? 'cancelled' : 'completed / started'}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <>
+          <h2>Upcoming</h2>
+          {active.length === 0 ? (
+            <div className="empty">
+              <p className="muted">
+                No upcoming bookings. <Link to="/">Browse sessions →</Link>
+              </p>
+            </div>
+          ) : (
+            <ul className="plain-list">
+              {active.map((b) => (
+                <BookingRow
+                  key={b.id}
+                  booking={b}
+                  onCancel={cancel}
+                  busy={busyId === b.id}
+                />
+              ))}
+            </ul>
+          )}
+
+          {past.length > 0 && (
+            <>
+              <h2>Past</h2>
+              <ul className="plain-list">
+                {past.map((b) => (
+                  <BookingRow key={b.id} booking={b} onCancel={cancel} busy={false} />
+                ))}
+              </ul>
+            </>
+          )}
+        </>
       )}
     </div>
   )

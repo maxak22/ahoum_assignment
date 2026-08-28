@@ -1,15 +1,15 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, apiErrorMessage } from '../api/client.js'
+import { useToast } from '../components/ToastContext.jsx'
 import { formatDateTime } from '../lib/format.js'
-import Loading from '../components/Loading.jsx'
+import { SkeletonRows } from '../components/Skeleton.jsx'
 import ErrorNote from '../components/ErrorNote.jsx'
-import EmptyState from '../components/EmptyState.jsx'
 
 export default function CreatorDashboard() {
+  const toast = useToast()
   const [sessions, setSessions] = useState(null)
   const [error, setError] = useState('')
-  const [actionError, setActionError] = useState('')
   const [busyId, setBusyId] = useState(null)
 
   const load = useCallback(() => {
@@ -22,39 +22,78 @@ export default function CreatorDashboard() {
 
   useEffect(load, [load])
 
-  const remove = async (id) => {
-    if (!window.confirm('Delete this session? Existing bookings will be removed.'))
+  const stats = useMemo(() => {
+    const list = sessions || []
+    const booked = list.reduce((n, s) => n + s.seats_taken, 0)
+    const capacity = list.reduce((n, s) => n + s.capacity, 0)
+    return {
+      count: list.length,
+      booked,
+      fill: capacity ? Math.round((booked / capacity) * 100) : 0,
+    }
+  }, [sessions])
+
+  const remove = async (session) => {
+    if (
+      !window.confirm(
+        `Delete "${session.title}"? Its ${session.seats_taken} booking(s) will be removed.`,
+      )
+    )
       return
-    setActionError('')
-    setBusyId(id)
+    setBusyId(session.id)
     try {
-      await api.delete(`/sessions/${id}/`)
+      await api.delete(`/sessions/${session.id}/`)
+      toast.success('Session deleted')
       load()
     } catch (err) {
-      setActionError(apiErrorMessage(err, 'Could not delete.'))
+      toast.error(apiErrorMessage(err, 'Could not delete.'))
     } finally {
       setBusyId(null)
     }
   }
 
-  if (error) return <ErrorNote>{error}</ErrorNote>
-  if (!sessions) return <Loading label="Loading your sessions…" />
-
   return (
     <div>
       <div className="page-head">
-        <h1>Your sessions</h1>
+        <div>
+          <p className="eyebrow">Creator</p>
+          <h1>Dashboard</h1>
+        </div>
         <Link className="button" to="/sessions/new">
-          New session
+          + New session
         </Link>
       </div>
 
-      <ErrorNote>{actionError}</ErrorNote>
+      {error && <ErrorNote>{error}</ErrorNote>}
 
-      {sessions.length === 0 ? (
-        <EmptyState>
-          You have not created any sessions yet.
-        </EmptyState>
+      <div className="stat-row">
+        <div className="stat">
+          <span className="stat-num">{sessions ? stats.count : '—'}</span>
+          <span className="stat-label">Sessions</span>
+        </div>
+        <div className="stat">
+          <span className="stat-num">{sessions ? stats.booked : '—'}</span>
+          <span className="stat-label">Seats booked</span>
+        </div>
+        <div className="stat">
+          <span className="stat-num">{sessions ? `${stats.fill}%` : '—'}</span>
+          <span className="stat-label">Fill rate</span>
+        </div>
+      </div>
+
+      {!sessions ? (
+        <SkeletonRows count={3} />
+      ) : sessions.length === 0 ? (
+        <div className="empty">
+          <div className="empty-icon" aria-hidden="true">
+            ✳
+          </div>
+          <h3>No sessions yet</h3>
+          <p className="muted">Publish your first session to start taking bookings.</p>
+          <Link className="button" to="/sessions/new">
+            Create a session
+          </Link>
+        </div>
       ) : (
         <div className="table-wrap">
           <table className="table">
@@ -73,17 +112,23 @@ export default function CreatorDashboard() {
                   <td>
                     <Link to={`/sessions/${s.id}`}>{s.title}</Link>
                   </td>
-                  <td>{formatDateTime(s.start_at)}</td>
+                  <td className="muted">{formatDateTime(s.start_at)}</td>
                   <td>
-                    {s.seats_taken} / {s.capacity}
+                    <span className="count-pill">
+                      {s.seats_taken} / {s.capacity}
+                    </span>
                   </td>
-                  <td>{s.is_public ? 'Public' : 'Private'}</td>
+                  <td>
+                    <span className={s.is_public ? 'tag tag-ok' : 'tag'}>
+                      {s.is_public ? 'Public' : 'Private'}
+                    </span>
+                  </td>
                   <td className="actions">
                     <Link to={`/sessions/${s.id}/edit`}>Edit</Link>
                     <button
                       className="link-button danger"
                       disabled={busyId === s.id}
-                      onClick={() => remove(s.id)}
+                      onClick={() => remove(s)}
                     >
                       Delete
                     </button>

@@ -1,30 +1,48 @@
 import { Link } from 'react-router-dom'
-import { formatDateTime } from '../lib/format.js'
+import DateBadge from './DateBadge.jsx'
+import SeatMeter from './SeatMeter.jsx'
+import Avatar from './Avatar.jsx'
+
+function timeLabel(iso) {
+  return new Date(iso).toLocaleString(undefined, {
+    weekday: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
 
 export default function SessionCard({ session }) {
-  const seatsLeft = session.remaining_seats > 0
-
+  const host = session.creator || {}
   return (
-    <li className="card">
-      <div className="card-body">
-        <Link to={`/sessions/${session.id}`} className="card-title">
-          {session.title}
-        </Link>
-        <p className="muted small">
-          {formatDateTime(session.start_at)} · {session.duration_minutes} min
+    <li className="s-card">
+      <Link to={`/sessions/${session.id}`} className="s-card-link">
+        <div className="s-card-top">
+          <DateBadge iso={session.start_at} />
+          <div className="s-card-head">
+            <h3>{session.title}</h3>
+            <p className="muted small">
+              {timeLabel(session.start_at)} · {session.duration_minutes} min
+            </p>
+          </div>
+        </div>
+
+        <p className="s-card-desc">
+          {session.description || 'No description provided.'}
         </p>
-        <p className="muted small">
-          Hosted by {session.creator?.full_name || session.creator?.email || 'Unknown'}
-        </p>
-      </div>
-      <div className="card-aside">
-        <span className={seatsLeft ? 'pill pill-ok' : 'pill pill-muted'}>
-          {seatsLeft
-            ? `${session.remaining_seats} of ${session.capacity} seats`
-            : 'Fully booked'}
-        </span>
-        {session.has_started && <span className="pill pill-muted">Started</span>}
-      </div>
+
+        <SeatMeter
+          taken={session.seats_taken}
+          capacity={session.capacity}
+          started={session.has_started}
+        />
+
+        <div className="s-card-foot">
+          <Avatar name={host.full_name} email={host.email} size={24} />
+          <span className="muted small">
+            {host.full_name || host.email || 'Unknown host'}
+          </span>
+        </div>
+      </Link>
     </li>
   )
 }
