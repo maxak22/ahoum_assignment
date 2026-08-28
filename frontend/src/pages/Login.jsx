@@ -167,17 +167,17 @@ function LoginView() {
                 <span>or</span>
               </div>
               <div className="auth-google">
-                <div className="auth-google-clip">
-                  <GoogleLogin
-                    onSuccess={onGoogle}
-                    onError={() =>
-                      setError('Google sign-in was cancelled or failed.')
-                    }
-                    shape="pill"
-                    size="large"
-                    text="continue_with"
-                  />
-                </div>
+                <GoogleLogin
+                  onSuccess={onGoogle}
+                  onError={() =>
+                    setError('Google sign-in was cancelled or failed.')
+                  }
+                  theme="outline"
+                  shape="rectangular"
+                  size="large"
+                  text="continue_with"
+                  width="330"
+                />
               </div>
             </>
           )}
