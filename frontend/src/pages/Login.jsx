@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useLocation, Navigate, Link } from 'react-router-dom'
 import { GoogleLogin } from '@react-oauth/google'
 import { useAuth } from '../auth/AuthContext.jsx'
@@ -6,7 +6,6 @@ import { apiErrorMessage } from '../api/client.js'
 import BrandMark from '../components/BrandMark.jsx'
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
-const showDev = import.meta.env.DEV || !googleClientId
 
 export default function Login() {
   const { user, loginWithGoogle, devLogin } = useAuth()
@@ -14,10 +13,34 @@ export default function Login() {
   const location = useLocation()
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [googleReady, setGoogleReady] = useState(false)
+
+  const [email, setEmail] = useState('reviewer@example.com')
+  const [asCreator, setAsCreator] = useState(true)
+
+  // Google Identity Services injects `window.google.accounts`. If it never shows
+  // up (ad blocker / privacy browser), we quietly hide the Google option.
+  useEffect(() => {
+    if (!googleClientId) return
+    if (window.google?.accounts?.id) {
+      setGoogleReady(true)
+      return
+    }
+    const t = setInterval(() => {
+      if (window.google?.accounts?.id) {
+        setGoogleReady(true)
+        clearInterval(t)
+      }
+    }, 300)
+    const stop = setTimeout(() => clearInterval(t), 4000)
+    return () => {
+      clearInterval(t)
+      clearTimeout(stop)
+    }
+  }, [])
 
   const redirectTo = location.state?.from?.pathname || '/'
   if (user) return <Navigate to={redirectTo} replace />
-
   const done = () => navigate(redirectTo, { replace: true })
 
   const onGoogle = async (res) => {
@@ -33,14 +56,15 @@ export default function Login() {
     }
   }
 
-  const onDev = async (email, isCreator) => {
+  const onEmail = async (e) => {
+    e.preventDefault()
     setError('')
     setBusy(true)
     try {
-      await devLogin(email, isCreator)
+      await devLogin(email.trim(), asCreator)
       done()
     } catch (err) {
-      setError(apiErrorMessage(err, 'Dev login failed — is the backend in DEBUG mode?'))
+      setError(apiErrorMessage(err, 'Could not sign in with that email.'))
     } finally {
       setBusy(false)
     }
@@ -97,7 +121,7 @@ export default function Login() {
         <div className="auth-form">
           <p className="eyebrow">Get started</p>
           <h2>Sign in to continue</h2>
-          <p className="muted">Use your Google account — we never see your password.</p>
+          <p className="muted">Pick up where you left off, or start fresh.</p>
 
           {error && (
             <p className="error" role="alert" style={{ marginTop: 16 }}>
@@ -105,73 +129,55 @@ export default function Login() {
             </p>
           )}
 
-          <div className="auth-google">
-            {googleClientId ? (
-              <GoogleLogin
-                onSuccess={onGoogle}
-                onError={() => setError('Google sign-in was cancelled or failed.')}
-                shape="pill"
-                size="large"
-                width="320"
-                text="continue_with"
+          <form className="auth-email" onSubmit={onEmail}>
+            <label>
+              Email
+              <input
+                type="email"
+                value={email}
+                required
+                autoComplete="email"
+                onChange={(e) => setEmail(e.target.value)}
               />
-            ) : (
-              <p className="muted small">
-                Google isn’t configured — use the test sign-in below.
-              </p>
-            )}
-          </div>
+            </label>
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={asCreator}
+                onChange={(e) => setAsCreator(e.target.checked)}
+              />
+              Sign in as a host (you can change this later)
+            </label>
+            <button type="submit" className="block" disabled={busy}>
+              {busy ? 'Signing in…' : 'Continue'}
+            </button>
+          </form>
 
-          {showDev && (
+          {googleClientId && googleReady && (
             <>
               <div className="auth-divider">
-                <span>{googleClientId ? 'or for reviewers' : 'test sign-in'}</span>
+                <span>or</span>
               </div>
-              <DevForm busy={busy} onSubmit={onDev} />
+              <div className="auth-google">
+                <GoogleLogin
+                  onSuccess={onGoogle}
+                  onError={() =>
+                    setError('Google sign-in was cancelled or failed.')
+                  }
+                  shape="pill"
+                  size="large"
+                  width="320"
+                  text="continue_with"
+                />
+              </div>
             </>
           )}
 
           <p className="auth-fineprint">
-            By continuing you agree this is a demo app and not a real service.
+            A demo project — sessions and bookings may reset.
           </p>
         </div>
       </main>
     </div>
-  )
-}
-
-function DevForm({ busy, onSubmit }) {
-  const [email, setEmail] = useState('reviewer@example.com')
-  const [isCreator, setIsCreator] = useState(true)
-  return (
-    <form
-      className="auth-dev"
-      onSubmit={(e) => {
-        e.preventDefault()
-        onSubmit(email.trim(), isCreator)
-      }}
-    >
-      <label>
-        Email
-        <input
-          type="email"
-          value={email}
-          required
-          onChange={(e) => setEmail(e.target.value)}
-        />
-      </label>
-      <label className="checkbox">
-        <input
-          type="checkbox"
-          checked={isCreator}
-          onChange={(e) => setIsCreator(e.target.checked)}
-        />
-        Sign in as a creator
-      </label>
-      <button type="submit" className="block" disabled={busy}>
-        {busy ? 'Signing in…' : 'Continue'}
-      </button>
-      <span className="muted small">Needs the backend running with DEBUG=1.</span>
-    </form>
   )
 }
