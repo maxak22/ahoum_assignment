@@ -107,10 +107,12 @@ usable immediately: the sign-in page shows a **dev-login box** (email + a
 "create as creator" checkbox) that works while `DJANGO_DEBUG=1`. To use real
 Google sign-in instead, see §5.
 
-To seed a couple of predictable users + JWTs for API poking:
+Populate the catalog with demo sessions (language, yoga, design, music,
+interviews, cooking, …) and seed a couple of predictable users + JWTs:
 
 ```bash
-docker compose exec backend python manage.py seed_dev_users
+docker compose exec backend python manage.py seed_sessions   # 8 demo sessions
+docker compose exec backend python manage.py seed_dev_users   # dev users + printed JWTs
 ```
 
 ### Trying the two roles
